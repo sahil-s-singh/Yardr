@@ -8,8 +8,13 @@ import { ThemedView } from '@/components/themed-view';
 import { GarageSale } from '@/types/garageSale';
 import { garageSaleService } from '@/services/garageSaleService';
 import { Video, ResizeMode } from 'expo-av';
+import { useAuth } from '@/contexts/AuthContext';
+import { historyService } from '@/services/historyService';
+import FavoriteButton from '@/components/FavoriteButton';
+import ReminderButton from '@/components/ReminderButton';
 
 export default function HomeScreen() {
+  const { user, isAuthenticated } = useAuth();
   const [location, setLocation] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [garageSales, setGarageSales] = useState<GarageSale[]>([]);
@@ -89,6 +94,13 @@ export default function HomeScreen() {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
+  const handleCalloutPress = (sale: GarageSale) => {
+    // Track view if user is authenticated
+    if (isAuthenticated && user) {
+      historyService.recordView(user.id, sale.id);
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -139,7 +151,7 @@ export default function HomeScreen() {
                 }}
                 pinColor="red"
               >
-                <Callout tooltip style={styles.calloutContainer}>
+                <Callout tooltip style={styles.calloutContainer} onPress={() => handleCalloutPress(sale)}>
                   <View style={styles.calloutCard}>
                     {/* Video Preview */}
                     {sale.videoUrl && (
@@ -193,6 +205,18 @@ export default function HomeScreen() {
                           </ThemedText>
                         </View>
                       )}
+
+                      {/* Action Buttons */}
+                      <View style={styles.calloutActions}>
+                        <FavoriteButton garageSaleId={sale.id} size={20} showLabel />
+                        <ReminderButton
+                          garageSaleId={sale.id}
+                          garageSaleTitle={sale.title}
+                          garageSaleDate={sale.startDate || sale.date}
+                          size={20}
+                          showLabel
+                        />
+                      </View>
                     </View>
                   </View>
                 </Callout>
@@ -356,6 +380,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     flex: 1,
     color: '#333',
+  },
+  calloutActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    gap: 8,
   },
   addButton: {
     position: 'absolute',

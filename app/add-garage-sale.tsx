@@ -20,12 +20,14 @@ import * as VideoThumbnails from 'expo-video-thumbnails';
 import { readAsStringAsync, EncodingType } from 'expo-file-system/legacy';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { rateLimitService } from '@/services/rateLimitService';
+import { useAuth } from '@/contexts/AuthContext';
 // import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 // import { GOOGLE_MAPS_API_KEY } from '@/constants/config';
 
 export default function AddGarageSaleScreen() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [showCamera, setShowCamera] = useState(true); // Start with camera
+  const [showCamera, setShowCamera] = useState(true); // Start with camera, but allow skip
   const [analyzing, setAnalyzing] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
@@ -485,7 +487,7 @@ export default function AddGarageSaleScreen() {
         contactEmail: form.contactEmail || undefined,
         videoUrl: videoUrl || undefined,
         isActive: true,
-      }, deviceId);
+      }, deviceId, user?.id);
 
       Alert.alert('Success', 'Your garage sale has been posted!', [
         {
@@ -501,12 +503,12 @@ export default function AddGarageSaleScreen() {
     }
   };
 
-  // Show camera first
+  // Show camera when user wants to add video
   if (showCamera) {
     return (
       <VideoRecorder
         onVideoRecorded={handleVideoRecorded}
-        onCancel={() => router.back()}
+        onCancel={() => setShowCamera(false)}
       />
     );
   }

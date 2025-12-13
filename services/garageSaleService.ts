@@ -22,6 +22,7 @@ interface GarageSaleRow {
   video_url: string | null;
   is_active: boolean;
   created_at: string;
+  user_id: string | null;
 }
 
 // Convert database row to app model
@@ -48,6 +49,7 @@ const mapRowToGarageSale = (row: GarageSaleRow): GarageSale => {
     videoUrl: row.video_url || undefined,
     isActive: row.is_active,
     createdAt: row.created_at,
+    userId: row.user_id || undefined,
   };
 };
 
@@ -134,7 +136,8 @@ export const garageSaleService = {
   // Add a new garage sale
   addGarageSale: async (
     sale: Omit<GarageSale, 'id' | 'createdAt'>,
-    deviceId?: string
+    deviceId?: string,
+    userId?: string
   ): Promise<GarageSale> => {
     try {
       const insertData: any = {
@@ -160,6 +163,11 @@ export const garageSaleService = {
       // Only include device_id if provided (column may not exist yet)
       if (deviceId) {
         insertData.device_id = deviceId;
+      }
+
+      // Include user_id if authenticated user is creating the sale
+      if (userId) {
+        insertData.user_id = userId;
       }
 
       const { data, error } = await supabase
@@ -203,6 +211,7 @@ export const garageSaleService = {
       if (updates.contactPhone !== undefined) updateData.contact_phone = updates.contactPhone;
       if (updates.contactEmail !== undefined) updateData.contact_email = updates.contactEmail;
       if (updates.images !== undefined) updateData.images = updates.images;
+      if (updates.videoUrl !== undefined) updateData.video_url = updates.videoUrl;
       if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
 
       const { data, error } = await supabase
@@ -238,6 +247,100 @@ export const garageSaleService = {
       }
     } catch (error) {
       console.error('Error deleting garage sale:', error);
+      throw error;
+    }
+  },
+
+  // Get garage sales created by a specific user
+  getGarageSalesByUser: async (userId: string): Promise<GarageSale[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('garage_sales')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      return (data || []).map(mapRowToGarageSale);
+    } catch (error) {
+      console.error('Error fetching user garage sales:', error);
+      throw error;
+    }
+  },
+
+  // Get garage sales created by a specific device
+  getGarageSalesByDevice: async (deviceId: string): Promise<GarageSale[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('garage_sales')
+        .select('*')
+        .eq('device_id', deviceId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      return (data || []).map(mapRowToGarageSale);
+    } catch (error) {
+      console.error('Error fetching device garage sales:', error);
+      throw error;
+    }
+  },
+
+  // Get garage sales created by either user or device
+  getGarageSalesByUserOrDevice: async (
+    userId: string | null,
+    deviceId: string
+  ): Promise<GarageSale[]> => {
+    try {
+      let query = supabase
+        .from('garage_sales')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      // If user is logged in, get sales by user_id OR device_id
+      // If not logged in, get sales by device_id only
+      if (userId) {
+        query = query.or(`user_id.eq.${userId},device_id.eq.${deviceId}`);
+      } else {
+        query = query.eq('device_id', deviceId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      return (data || []).map(mapRowToGarageSale);
+    } catch (error) {
+      console.error('Error fetching user/device garage sales:', error);
+      throw error;
+    }
+  },
+
+  // Claim all device sales when user signs up/logs in
+  claimDeviceSales: async (deviceId: string): Promise<number> => {
+    try {
+      const { data, error } = await supabase.rpc('claim_device_sales', {
+        p_device_id: deviceId,
+      });
+
+      if (error) {
+        console.error('Supabase error claiming device sales:', error);
+        throw error;
+      }
+
+      return data || 0;
+    } catch (error) {
+      console.error('Error claiming device sales:', error);
       throw error;
     }
   },

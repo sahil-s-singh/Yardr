@@ -20,6 +20,7 @@ export interface GarageSale {
   videoUrl?: string; // URL to video
   createdAt: string; // ISO string
   isActive: boolean;
+  userId?: string; // Optional - only set for authenticated users
 }
 
 export type GarageSaleCategory =

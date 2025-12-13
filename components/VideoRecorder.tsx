@@ -182,7 +182,7 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
           {!isRecording && !countdown && (
             <>
               <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={onCancel}>
-                <Text style={styles.buttonText}>Cancel</Text>
+                <Text style={styles.buttonText}>Skip Video</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.recordButton} onPress={startRecording}>
                 <View style={styles.recordButtonInner} />
@@ -199,10 +199,10 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
 
         <View style={styles.instructionsContainer}>
           <ThemedText style={styles.instructionsText}>
-            📹 Record a 5-second video of your garage sale items
+            📹 Record a 5-second video (Optional)
           </ThemedText>
           <ThemedText style={styles.instructionsSubtext}>
-            AI will automatically analyze and describe your items
+            AI will auto-fill your listing, or tap "Skip Video" to fill manually
           </ThemedText>
         </View>
       </CameraView>
