@@ -1,418 +1,513 @@
-import { useState, useEffect } from 'react';
-import { StyleSheet, View, Dimensions, Alert, TouchableOpacity } from 'react-native';
-import MapView, { Marker, Callout, PROVIDER_DEFAULT } from 'react-native-maps';
-import * as Location from 'expo-location';
-import { router } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { GarageSale } from '@/types/garageSale';
-import { garageSaleService } from '@/services/garageSaleService';
-import { Video, ResizeMode } from 'expo-av';
-import { useAuth } from '@/contexts/AuthContext';
-import { historyService } from '@/services/historyService';
-import FavoriteButton from '@/components/FavoriteButton';
-import ReminderButton from '@/components/ReminderButton';
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { garageSaleService } from "@/services/garageSaleService";
+import { GarageSale } from "@/types/garageSale";
+import { ResizeMode, Video } from "expo-av";
+import * as Location from "expo-location";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+	Alert,
+	Image,
+	ScrollView,
+	StyleSheet,
+	TouchableOpacity,
+	View,
+} from "react-native";
+import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 
-export default function HomeScreen() {
-  const { user, isAuthenticated } = useAuth();
-  const [location, setLocation] = useState<any>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [garageSales, setGarageSales] = useState<GarageSale[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [mapType, setMapType] = useState<'standard' | 'satellite' | 'hybrid'>('standard');
+export default function DiscoverScreen() {
+	const [location, setLocation] = useState<any>(null);
+	const [errorMsg, setErrorMsg] = useState<string | null>(null);
+	const [garageSales, setGarageSales] = useState<GarageSale[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [viewMode, setViewMode] = useState<"list" | "map">("list");
 
-  // Load user location
-  useEffect(() => {
-    (async () => {
-      try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setErrorMsg('Permission to access location was denied');
-          Alert.alert('Permission Denied', 'Please enable location services to use this feature');
-          setLoading(false);
-          return;
-        }
+	useEffect(() => {
+		(async () => {
+			try {
+				let { status } = await Location.requestForegroundPermissionsAsync();
+				if (status !== "granted") {
+					setErrorMsg("Permission to access location was denied");
+					Alert.alert(
+						"Permission Denied",
+						"Please enable location services to use this feature"
+					);
+					setLoading(false);
+					return;
+				}
 
-        let currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
+				let currentLocation = await Location.getCurrentPositionAsync({
+					accuracy: Location.Accuracy.High,
+				});
 
-        console.log('Current location:', currentLocation.coords);
+				setLocation({
+					latitude: currentLocation.coords.latitude,
+					longitude: currentLocation.coords.longitude,
+					latitudeDelta: 0.0922,
+					longitudeDelta: 0.0421,
+				});
+			} catch (error: any) {
+				console.error("Error getting location:", error);
+				setErrorMsg("Error getting location: " + error.message);
+			} finally {
+				setLoading(false);
+			}
+		})();
+	}, []);
 
-        setLocation({
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        });
-      } catch (error: any) {
-        console.error('Error getting location:', error);
-        setErrorMsg('Error getting location: ' + error.message);
-        Alert.alert('Location Error', 'Failed to get your current location.');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+	useEffect(() => {
+		if (location) {
+			loadGarageSales();
+		}
+	}, [location]);
 
-  // Load garage sales when location is available
-  useEffect(() => {
-    if (location) {
-      loadGarageSales();
-    }
-  }, [location]);
+	const loadGarageSales = async () => {
+		try {
+			const sales = await garageSaleService.getAllGarageSales();
+			setGarageSales(sales);
+		} catch (error) {
+			console.error("Error loading garage sales:", error);
+			Alert.alert("Error", "Failed to load garage sales");
+		}
+	};
 
-  const loadGarageSales = async () => {
-    try {
-      console.log('🔄 Loading garage sales...');
-      const sales = await garageSaleService.getAllGarageSales();
-      setGarageSales(sales);
-      console.log(`✅ Loaded ${sales.length} garage sales:`);
-      sales.forEach((sale, idx) => {
-        console.log(`  ${idx + 1}. ${sale.title} - ${sale.address} (${sale.date})`);
-      });
-    } catch (error) {
-      console.error('❌ Error loading garage sales:', error);
-      Alert.alert('Error', 'Failed to load garage sales');
-    }
-  };
+	const calculateDistance = (saleLat: number, saleLng: number): string => {
+		if (!location) return "N/A";
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
+		const R = 6371; // Earth's radius in km
+		const dLat = toRad(saleLat - location.latitude);
+		const dLon = toRad(saleLng - location.longitude);
+		const lat1 = toRad(location.latitude);
+		const lat2 = toRad(saleLat);
 
-  const formatTime = (time: string) => {
-    const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
+		const a =
+			Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+			Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+		const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+		const distance = R * c;
 
-  const handleCalloutPress = (sale: GarageSale) => {
-    // Track view if user is authenticated
-    if (isAuthenticated && user) {
-      historyService.recordView(user.id, sale.id);
-    }
-  };
+		if (distance < 1) {
+			return `${Math.round(distance * 1000)}m`;
+		}
+		return `${distance.toFixed(1)}km`;
+	};
 
-  return (
-    <View style={styles.container}>
-      {/* Header */}
-      <ThemedView style={styles.header}>
-        <View>
-          <ThemedText type="title">Yardr</ThemedText>
-          <ThemedText style={styles.subtitle}>
-            {garageSales.length} garage sales nearby
-          </ThemedText>
-        </View>
-        <TouchableOpacity
-          onPress={loadGarageSales}
-          style={styles.refreshButton}
-        >
-          <ThemedText style={styles.refreshText}>🔄 Refresh</ThemedText>
-        </TouchableOpacity>
-      </ThemedView>
+	const toRad = (value: number): number => {
+		return (value * Math.PI) / 180;
+	};
 
-      {/* Map */}
-      {location && !loading ? (
-        <>
-          <MapView
-            style={styles.map}
-            initialRegion={location}
-            mapType={mapType}
-            showsUserLocation={true}
-            showsMyLocationButton={true}
-            showsCompass={true}
-            provider={PROVIDER_DEFAULT}
-          >
-            {/* User location marker */}
-            <Marker
-              coordinate={{
-                latitude: location.latitude,
-                longitude: location.longitude,
-              }}
-              title="You are here"
-              pinColor="blue"
-            />
+	const formatDate = (dateString: string) => {
+		const date = new Date(dateString);
+		return date.toLocaleDateString("en-US", {
+			weekday: "short",
+			month: "short",
+			day: "numeric",
+		});
+	};
 
-            {/* Garage sale markers */}
-            {garageSales.map((sale) => (
-              <Marker
-                key={sale.id}
-                coordinate={{
-                  latitude: sale.location.latitude,
-                  longitude: sale.location.longitude,
-                }}
-                pinColor="red"
-              >
-                <Callout tooltip style={styles.calloutContainer} onPress={() => handleCalloutPress(sale)}>
-                  <View style={styles.calloutCard}>
-                    {/* Video Preview */}
-                    {sale.videoUrl && (
-                      <Video
-                        source={{ uri: sale.videoUrl }}
-                        style={styles.calloutVideo}
-                        resizeMode={ResizeMode.COVER}
-                        isLooping
-                        shouldPlay
-                        isMuted
-                      />
-                    )}
+	const formatTime = (time: string) => {
+		const [hours, minutes] = time.split(":");
+		const hour = parseInt(hours);
+		const ampm = hour >= 12 ? "PM" : "AM";
+		const displayHour = hour % 12 || 12;
+		return `${displayHour}:${minutes} ${ampm}`;
+	};
 
-                    {/* Details */}
-                    <View style={styles.calloutContent}>
-                      <ThemedText style={styles.calloutTitle}>{sale.title}</ThemedText>
+	const isOpen = (sale: GarageSale): boolean => {
+		const now = new Date();
+		const saleDate = new Date(sale.date);
+		const [startHour, startMin] = sale.startTime.split(":").map(Number);
+		const [endHour, endMin] = sale.endTime.split(":").map(Number);
 
-                      <View style={styles.calloutRow}>
-                        <ThemedText style={styles.calloutIcon}>📅</ThemedText>
-                        <ThemedText style={styles.calloutText}>
-                          {formatDate(sale.date)}
-                        </ThemedText>
-                      </View>
+		saleDate.setHours(startHour, startMin, 0);
+		const endTime = new Date(sale.date);
+		endTime.setHours(endHour, endMin, 0);
 
-                      <View style={styles.calloutRow}>
-                        <ThemedText style={styles.calloutIcon}>🕐</ThemedText>
-                        <ThemedText style={styles.calloutText}>
-                          {formatTime(sale.startTime)} - {formatTime(sale.endTime)}
-                        </ThemedText>
-                      </View>
+		return now >= saleDate && now <= endTime;
+	};
 
-                      <View style={styles.calloutRow}>
-                        <ThemedText style={styles.calloutIcon}>📍</ThemedText>
-                        <ThemedText style={styles.calloutText} numberOfLines={1}>
-                          {sale.location.address}
-                        </ThemedText>
-                      </View>
+	const renderListView = () => (
+		<ScrollView
+			style={styles.listContainer}
+			contentContainerStyle={styles.listContent}
+		>
+			{garageSales.map((sale) => (
+				<TouchableOpacity
+					key={sale.id}
+					style={styles.saleCard}
+					onPress={() => router.push(`/sale-detail/${sale.id}`)}
+				>
+					{/* Media Section */}
+					{sale.videoUrl ? (
+						<Video
+							source={{ uri: sale.videoUrl }}
+							style={styles.cardMedia}
+							resizeMode={ResizeMode.COVER}
+							isLooping
+							isMuted
+							shouldPlay={false}
+						/>
+					) : sale.images && sale.images.length > 0 ? (
+						<View style={styles.cardMedia}>
+							<Image
+								source={{ uri: sale.images[0] }}
+								style={styles.cardImage}
+							/>
+						</View>
+					) : (
+						<View style={[styles.cardMedia, styles.noMedia]}>
+							<ThemedText style={styles.noMediaText}>📦</ThemedText>
+						</View>
+					)}
 
-                      <View style={styles.calloutRow}>
-                        <ThemedText style={styles.calloutIcon}>📝</ThemedText>
-                        <ThemedText style={styles.calloutText} numberOfLines={2}>
-                          {sale.description}
-                        </ThemedText>
-                      </View>
+					{/* Status Badge */}
+					<View
+						style={[
+							styles.statusBadge,
+							isOpen(sale) ? styles.openBadge : styles.closedBadge,
+						]}
+					>
+						<ThemedText style={styles.statusText}>
+							{isOpen(sale) ? "● Open" : "● Closed"}
+						</ThemedText>
+					</View>
 
-                      {sale.contactName && (
-                        <View style={styles.calloutRow}>
-                          <ThemedText style={styles.calloutIcon}>👤</ThemedText>
-                          <ThemedText style={styles.calloutText}>
-                            {sale.contactName}
-                          </ThemedText>
-                        </View>
-                      )}
+					{/* Content */}
+					<View style={styles.cardContent}>
+						<ThemedText style={styles.cardTitle}>{sale.title}</ThemedText>
 
-                      {/* Action Buttons */}
-                      <View style={styles.calloutActions}>
-                        <FavoriteButton garageSaleId={sale.id} size={20} showLabel />
-                        <ReminderButton
-                          garageSaleId={sale.id}
-                          garageSaleTitle={sale.title}
-                          garageSaleDate={sale.startDate || sale.date}
-                          size={20}
-                          showLabel
-                        />
-                      </View>
-                    </View>
-                  </View>
-                </Callout>
-              </Marker>
-            ))}
-          </MapView>
+						<View style={styles.cardRow}>
+							<ThemedText style={styles.cardIcon}>📍</ThemedText>
+							<ThemedText style={styles.cardText}>
+								{calculateDistance(
+									sale.location.latitude,
+									sale.location.longitude
+								)}{" "}
+								away
+							</ThemedText>
+						</View>
 
-          {/* Map Type Toggle */}
-          <View style={styles.mapTypeControls}>
-            <TouchableOpacity
-              style={[styles.mapTypeButton, mapType === 'standard' && styles.mapTypeButtonActive]}
-              onPress={() => setMapType('standard')}
-            >
-              <ThemedText style={styles.mapTypeButtonText}>Map</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.mapTypeButton, mapType === 'satellite' && styles.mapTypeButtonActive]}
-              onPress={() => setMapType('satellite')}
-            >
-              <ThemedText style={styles.mapTypeButtonText}>Satellite</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.mapTypeButton, mapType === 'hybrid' && styles.mapTypeButtonActive]}
-              onPress={() => setMapType('hybrid')}
-            >
-              <ThemedText style={styles.mapTypeButtonText}>Hybrid</ThemedText>
-            </TouchableOpacity>
-          </View>
+						<View style={styles.cardRow}>
+							<ThemedText style={styles.cardIcon}>📅</ThemedText>
+							<ThemedText style={styles.cardText}>
+								{formatDate(sale.date)} • {formatTime(sale.startTime)}-
+								{formatTime(sale.endTime)}
+							</ThemedText>
+						</View>
 
-          {/* Floating Add Button */}
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => router.push('/add-garage-sale')}
-          >
-            <ThemedText style={styles.addButtonText}>+</ThemedText>
-          </TouchableOpacity>
-        </>
-      ) : (
-        <ThemedView style={styles.loadingContainer}>
-          <ThemedText>
-            {errorMsg || 'Loading map...'}
-          </ThemedText>
-        </ThemedView>
-      )}
+						{sale.categories && sale.categories.length > 0 && (
+							<View style={styles.categoriesRow}>
+								{sale.categories.slice(0, 3).map((cat, idx) => (
+									<View key={idx} style={styles.categoryTag}>
+										<ThemedText style={styles.categoryText}>{cat}</ThemedText>
+									</View>
+								))}
+								{sale.categories.length > 3 && (
+									<ThemedText style={styles.moreCategories}>
+										+{sale.categories.length - 3}
+									</ThemedText>
+								)}
+							</View>
+						)}
+					</View>
+				</TouchableOpacity>
+			))}
+		</ScrollView>
+	);
 
-    </View>
-  );
+	const renderMapView = () => (
+		<MapView
+			style={styles.map}
+			initialRegion={location}
+			showsUserLocation={true}
+			showsMyLocationButton={true}
+			provider={PROVIDER_DEFAULT}
+		>
+			{garageSales.map((sale) => (
+				<Marker
+					key={sale.id}
+					coordinate={{
+						latitude: sale.location.latitude,
+						longitude: sale.location.longitude,
+					}}
+					onPress={() => router.push(`/sale-detail/${sale.id}`)}
+				>
+					<View style={styles.markerContainer}>
+						<View
+							style={[
+								styles.marker,
+								isOpen(sale) ? styles.markerOpen : styles.markerClosed,
+							]}
+						>
+							<ThemedText style={styles.markerText}>🏷️</ThemedText>
+						</View>
+					</View>
+				</Marker>
+			))}
+		</MapView>
+	);
+
+	return (
+		<View style={styles.container}>
+			{/* Header */}
+			<ThemedView style={styles.header}>
+				<ThemedText type="title">Discover</ThemedText>
+				<ThemedText style={styles.subtitle}>
+					{garageSales.length} garage sales nearby
+				</ThemedText>
+			</ThemedView>
+
+			{/* View Toggle */}
+			<View style={styles.toggleContainer}>
+				<TouchableOpacity
+					style={[
+						styles.toggleButton,
+						viewMode === "list" && styles.toggleActive,
+					]}
+					onPress={() => setViewMode("list")}
+				>
+					<ThemedText
+						style={[
+							styles.toggleText,
+							viewMode === "list" && styles.toggleTextActive,
+						]}
+					>
+						📋 List
+					</ThemedText>
+				</TouchableOpacity>
+				<TouchableOpacity
+					style={[
+						styles.toggleButton,
+						viewMode === "map" && styles.toggleActive,
+					]}
+					onPress={() => setViewMode("map")}
+				>
+					<ThemedText
+						style={[
+							styles.toggleText,
+							viewMode === "map" && styles.toggleTextActive,
+						]}
+					>
+						🗺️ Map
+					</ThemedText>
+				</TouchableOpacity>
+			</View>
+
+			{/* Content */}
+			{loading ? (
+				<ThemedView style={styles.loadingContainer}>
+					<ThemedText>Loading nearby sales...</ThemedText>
+				</ThemedView>
+			) : errorMsg ? (
+				<ThemedView style={styles.loadingContainer}>
+					<ThemedText>{errorMsg}</ThemedText>
+				</ThemedView>
+			) : viewMode === "list" ? (
+				renderListView()
+			) : (
+				renderMapView()
+			)}
+
+			{/* Floating Add Button */}
+			<TouchableOpacity
+				style={styles.addButton}
+				onPress={() => router.push("/add-sale")}
+			>
+				<ThemedText style={styles.addButtonText}>+</ThemedText>
+			</TouchableOpacity>
+		</View>
+	);
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    padding: 20,
-    paddingTop: 60,
-    zIndex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  refreshButton: {
-    padding: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#0066FF',
-    borderRadius: 8,
-  },
-  refreshText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  subtitle: {
-    fontSize: 14,
-    marginTop: 8,
-    opacity: 0.7,
-  },
-  map: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height - 120,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mapTypeControls: {
-    position: 'absolute',
-    top: 140,
-    right: 20,
-    flexDirection: 'column',
-    backgroundColor: 'white',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    overflow: 'hidden',
-  },
-  mapTypeButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    minWidth: 90,
-  },
-  mapTypeButtonActive: {
-    backgroundColor: '#0066FF',
-  },
-  mapTypeButtonText: {
-    fontSize: 12,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  calloutContainer: {
-    minWidth: 280,
-    maxWidth: 320,
-  },
-  calloutCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  calloutVideo: {
-    width: '100%',
-    height: 160,
-    backgroundColor: '#000',
-  },
-  calloutContent: {
-    padding: 12,
-  },
-  calloutTitle: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 8,
-    color: '#000',
-  },
-  calloutRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 6,
-  },
-  calloutIcon: {
-    fontSize: 14,
-    marginRight: 6,
-    width: 20,
-  },
-  calloutText: {
-    fontSize: 12,
-    flex: 1,
-    color: '#333',
-  },
-  calloutActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    gap: 8,
-  },
-  addButton: {
-    position: 'absolute',
-    bottom: 40,
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#0066FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 32,
-    fontWeight: 'bold',
-    lineHeight: 32,
-  },
+	container: {
+		flex: 1,
+	},
+	header: {
+		padding: 20,
+		paddingTop: 60,
+	},
+	subtitle: {
+		fontSize: 14,
+		marginTop: 4,
+		opacity: 0.7,
+	},
+	toggleContainer: {
+		flexDirection: "row",
+		paddingHorizontal: 20,
+		paddingBottom: 12,
+		gap: 8,
+	},
+	toggleButton: {
+		flex: 1,
+		paddingVertical: 10,
+		paddingHorizontal: 16,
+		borderRadius: 8,
+		backgroundColor: "#f0f0f0",
+		alignItems: "center",
+	},
+	toggleActive: {
+		backgroundColor: "#0066FF",
+	},
+	toggleText: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: "#666",
+	},
+	toggleTextActive: {
+		color: "#fff",
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	listContainer: {
+		flex: 1,
+	},
+	listContent: {
+		padding: 16,
+		paddingBottom: 100,
+	},
+	saleCard: {
+		backgroundColor: "#fff",
+		borderRadius: 16,
+		marginBottom: 16,
+		overflow: "hidden",
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
+		elevation: 3,
+	},
+	cardMedia: {
+		width: "100%",
+		height: 180,
+		backgroundColor: "#f0f0f0",
+	},
+	cardImage: {
+		width: "100%",
+		height: "100%",
+	},
+	noMedia: {
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	noMediaText: {
+		fontSize: 48,
+		opacity: 0.3,
+	},
+	statusBadge: {
+		position: "absolute",
+		top: 12,
+		right: 12,
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 12,
+	},
+	openBadge: {
+		backgroundColor: "rgba(52, 199, 89, 0.9)",
+	},
+	closedBadge: {
+		backgroundColor: "rgba(255, 59, 48, 0.9)",
+	},
+	statusText: {
+		color: "#fff",
+		fontSize: 12,
+		fontWeight: "bold",
+	},
+	cardContent: {
+		padding: 16,
+	},
+	cardTitle: {
+		fontSize: 18,
+		fontWeight: "bold",
+		marginBottom: 12,
+	},
+	cardRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 6,
+	},
+	cardIcon: {
+		fontSize: 14,
+		marginRight: 8,
+		width: 20,
+	},
+	cardText: {
+		fontSize: 14,
+		opacity: 0.8,
+	},
+	categoriesRow: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		marginTop: 8,
+		gap: 6,
+	},
+	categoryTag: {
+		backgroundColor: "#E3F2FD",
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		borderRadius: 12,
+	},
+	categoryText: {
+		fontSize: 12,
+		color: "#1976D2",
+		fontWeight: "500",
+	},
+	moreCategories: {
+		fontSize: 12,
+		opacity: 0.6,
+		alignSelf: "center",
+	},
+	map: {
+		flex: 1,
+	},
+	markerContainer: {
+		alignItems: "center",
+	},
+	marker: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		justifyContent: "center",
+		alignItems: "center",
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.3,
+		shadowRadius: 3,
+		elevation: 5,
+	},
+	markerOpen: {
+		backgroundColor: "#34C759",
+	},
+	markerClosed: {
+		backgroundColor: "#FF3B30",
+	},
+	markerText: {
+		fontSize: 20,
+	},
+	addButton: {
+		position: "absolute",
+		bottom: 24,
+		right: 20,
+		width: 60,
+		height: 60,
+		borderRadius: 30,
+		backgroundColor: "#0066FF",
+		justifyContent: "center",
+		alignItems: "center",
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.3,
+		shadowRadius: 4.65,
+		elevation: 8,
+	},
+	addButtonText: {
+		color: "white",
+		fontSize: 32,
+		fontWeight: "bold",
+		lineHeight: 32,
+	},
 });
