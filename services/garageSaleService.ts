@@ -1,6 +1,7 @@
 import { GarageSale } from '@/types/garageSale';
 import { supabase } from '@/lib/supabase';
 import { checkNewSaleAgainstWishlists } from './wishlistService';
+import { recheckSaleAgainstWishlists } from './matchUpdateService';
 
 // Database row type from Supabase
 interface GarageSaleRow {
@@ -230,6 +231,14 @@ export const garageSaleService = {
       if (error) {
         console.error('Supabase error:', error);
         throw error;
+      }
+
+      // If title or description changed, re-run matching
+      if (updates.title !== undefined || updates.description !== undefined) {
+        // Background: Delete old matches and re-check sale against all wishlists
+        recheckSaleAgainstWishlists(id).catch(err => {
+          console.error('Error re-checking sale against wishlists:', err);
+        });
       }
 
       return mapRowToGarageSale(data);

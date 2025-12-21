@@ -94,6 +94,11 @@ CREATE POLICY "Users can delete own matches"
   TO authenticated
   USING (auth.uid() = user_id);
 
+CREATE POLICY "System can insert matches"
+  ON wishlist_matches FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
 -- ============================================================================
 -- NOTES:
 -- ============================================================================

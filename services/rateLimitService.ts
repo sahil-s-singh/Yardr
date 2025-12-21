@@ -2,8 +2,8 @@ import { supabase } from '@/lib/supabase';
 import * as Device from 'expo-device';
 
 // Rate limiting configuration
-const MAX_POSTS_PER_DAY = 3;
-const MAX_POSTS_PER_HOUR = 2;
+const MAX_POSTS_PER_DAY = 999; // Temporarily disabled for testing
+const MAX_POSTS_PER_HOUR = 999; // Temporarily disabled for testing
 
 export interface RateLimitCheck {
   allowed: boolean;

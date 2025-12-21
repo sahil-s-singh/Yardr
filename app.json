@@ -51,6 +51,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f9805b98-5747-42cd-bc89-11e9a70bbd08"
+      }
+    },
+    "owner": "sahil-s-singh"
   }
 }

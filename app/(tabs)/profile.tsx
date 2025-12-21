@@ -233,6 +233,23 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Debug Section */}
+        <View style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Developer Tools
+          </ThemedText>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push('/test-notification')}
+          >
+            <View style={styles.menuItemLeft}>
+              <ThemedText style={styles.menuIcon}>🔔</ThemedText>
+              <ThemedText style={styles.menuText}>Test Notifications</ThemedText>
+            </View>
+            <ThemedText style={styles.menuChevron}>›</ThemedText>
+          </TouchableOpacity>
+        </View>
+
         {/* Sign Out Button */}
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
           <ThemedText style={styles.signOutText}>Sign Out</ThemedText>
