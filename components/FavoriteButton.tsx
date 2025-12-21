@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { TouchableOpacity, StyleSheet, Alert, Animated } from 'react-native';
+import { TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/contexts/AuthContext';
 import { favoritesService } from '@/services/favoritesService';
+import { showSignInPrompt, showError } from '@/lib/alerts';
 
 interface FavoriteButtonProps {
   garageSaleId: string;
@@ -55,16 +56,10 @@ export default function FavoriteButton({
 
   const handlePress = async () => {
     if (!isAuthenticated) {
-      Alert.alert(
-        'Sign In Required',
+      showSignInPrompt(
+        router,
         'Please sign in to save your favorite garage sales',
-        [
-          { text: 'Maybe Later', style: 'cancel' },
-          {
-            text: 'Sign In',
-            onPress: () => router.push('/auth/sign-in'),
-          },
-        ]
+        'Sign In Required'
       );
       return;
     }
@@ -83,7 +78,7 @@ export default function FavoriteButton({
       }
     } catch (error: any) {
       console.error('Error toggling favorite:', error);
-      Alert.alert('Error', error.message || 'Failed to update favorite');
+      showError(error.message || 'Failed to update favorite');
     } finally {
       setLoading(false);
     }

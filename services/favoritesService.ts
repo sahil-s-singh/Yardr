@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { GarageSale } from '@/types/garageSale';
 import { UserFavorite } from '@/types/user';
+import { mapGarageSaleRow } from '@/lib/mappers';
 
 export const favoritesService = {
   /**
@@ -79,31 +80,7 @@ export const favoritesService = {
     return (data || [])
       .map((fav: any) => {
         if (!fav.garage_sales) return null;
-        const sale = fav.garage_sales;
-        return {
-          id: sale.id,
-          title: sale.title,
-          description: sale.description,
-          location: {
-            latitude: sale.latitude,
-            longitude: sale.longitude,
-            address: sale.address,
-          },
-          date: sale.date,
-          startDate: sale.start_date || sale.date,
-          endDate: sale.end_date || sale.date,
-          startTime: sale.start_time,
-          endTime: sale.end_time,
-          categories: sale.categories || [],
-          contactName: sale.contact_name,
-          contactPhone: sale.contact_phone,
-          contactEmail: sale.contact_email,
-          images: sale.images || [],
-          videoUrl: sale.video_url,
-          createdAt: sale.created_at,
-          isActive: sale.is_active,
-          userId: sale.user_id,
-        } as GarageSale;
+        return mapGarageSaleRow(fav.garage_sales);
       })
       .filter((sale): sale is GarageSale => sale !== null);
   },

@@ -3,6 +3,7 @@ import { UserWishlistItem, WishlistMatch, WishlistMatchWithDetails } from '@/typ
 import { GarageSale } from '@/types/garageSale';
 import { matchWishlistAgainstSale } from '@/lib/wishlistMatcher';
 import { sendWishlistMatchNotification } from '@/lib/wishlistNotifications';
+import { mapGarageSaleRow } from '@/lib/mappers';
 
 export const wishlistService = {
   /**
@@ -106,7 +107,7 @@ export const wishlistService = {
       notification_sent_at: match.notification_sent_at,
       match_confidence: match.match_confidence,
       match_reason: match.match_reason,
-      garage_sale: mapGarageSale(match.garage_sales),
+      garage_sale: mapGarageSaleRow(match.garage_sales),
       wishlist_item: match.user_wishlists,
     }));
   },
@@ -153,7 +154,7 @@ export const wishlistService = {
       notification_sent_at: match.notification_sent_at,
       match_confidence: match.match_confidence,
       match_reason: match.match_reason,
-      garage_sale: mapGarageSale(match.garage_sales),
+      garage_sale: mapGarageSaleRow(match.garage_sales),
       wishlist_item: match.user_wishlists,
     }));
   },
@@ -258,32 +259,6 @@ async function createMatchRecord(
   }
 }
 
-function mapGarageSale(sale: any): GarageSale {
-  return {
-    id: sale.id,
-    title: sale.title,
-    description: sale.description,
-    location: {
-      latitude: sale.latitude,
-      longitude: sale.longitude,
-      address: sale.address,
-    },
-    date: sale.date,
-    startDate: sale.start_date || sale.date,
-    endDate: sale.end_date || sale.date,
-    startTime: sale.start_time,
-    endTime: sale.end_time,
-    categories: sale.categories || [],
-    contactName: sale.contact_name,
-    contactPhone: sale.contact_phone,
-    contactEmail: sale.contact_email,
-    images: sale.images || [],
-    videoUrl: sale.video_url,
-    createdAt: sale.created_at,
-    isActive: sale.is_active,
-    userId: sale.user_id,
-  };
-}
 
 // Export helper function for use by garageSaleService
 export async function checkNewSaleAgainstWishlists(garageSaleId: string): Promise<void> {

@@ -2,58 +2,8 @@ import { GarageSale } from '@/types/garageSale';
 import { supabase } from '@/lib/supabase';
 import { checkNewSaleAgainstWishlists } from './wishlistService';
 import { recheckSaleAgainstWishlists } from './matchUpdateService';
-
-// Database row type from Supabase
-interface GarageSaleRow {
-  id: string;
-  title: string;
-  description: string;
-  latitude: number;
-  longitude: number;
-  address: string;
-  date: string;
-  start_date: string;
-  end_date: string;
-  start_time: string;
-  end_time: string;
-  categories: string[];
-  contact_name: string;
-  contact_phone: string | null;
-  contact_email: string | null;
-  images: string[] | null;
-  video_url: string | null;
-  is_active: boolean;
-  created_at: string;
-  user_id: string | null;
-}
-
-// Convert database row to app model
-const mapRowToGarageSale = (row: GarageSaleRow): GarageSale => {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    location: {
-      latitude: row.latitude,
-      longitude: row.longitude,
-      address: row.address,
-    },
-    date: row.date,
-    startDate: row.start_date || row.date, // Fallback to date for backward compatibility
-    endDate: row.end_date || row.date, // Fallback to date for backward compatibility
-    startTime: row.start_time,
-    endTime: row.end_time,
-    categories: row.categories,
-    contactName: row.contact_name,
-    contactPhone: row.contact_phone || undefined,
-    contactEmail: row.contact_email || undefined,
-    images: row.images || undefined,
-    videoUrl: row.video_url || undefined,
-    isActive: row.is_active,
-    createdAt: row.created_at,
-    userId: row.user_id || undefined,
-  };
-};
+import { mapGarageSaleRow } from '@/lib/mappers';
+import { calculateDistance } from '@/lib/locationUtils';
 
 // Service functions
 export const garageSaleService = {
@@ -71,7 +21,7 @@ export const garageSaleService = {
         throw error;
       }
 
-      return (data || []).map(mapRowToGarageSale);
+      return (data || []).map(mapGarageSaleRow);
     } catch (error) {
       console.error('Error fetching garage sales:', error);
       throw error;
@@ -98,7 +48,7 @@ export const garageSaleService = {
 
       // Filter by distance client-side
       const nearby = (data || [])
-        .map(mapRowToGarageSale)
+        .map(mapGarageSaleRow)
         .filter((sale) => {
           const distance = calculateDistance(
             { latitude, longitude },
@@ -128,7 +78,7 @@ export const garageSaleService = {
         throw error;
       }
 
-      return data ? mapRowToGarageSale(data) : null;
+      return data ? mapGarageSaleRow(data) : null;
     } catch (error) {
       console.error('Error fetching garage sale:', error);
       return null;
@@ -188,7 +138,7 @@ export const garageSaleService = {
         console.error('Error checking sale against wishlists:', err);
       });
 
-      return mapRowToGarageSale(data);
+      return mapGarageSaleRow(data);
     } catch (error) {
       console.error('Error adding garage sale:', error);
       throw error;
@@ -241,7 +191,7 @@ export const garageSaleService = {
         });
       }
 
-      return mapRowToGarageSale(data);
+      return mapGarageSaleRow(data);
     } catch (error) {
       console.error('Error updating garage sale:', error);
       throw error;
@@ -280,7 +230,7 @@ export const garageSaleService = {
         throw error;
       }
 
-      return (data || []).map(mapRowToGarageSale);
+      return (data || []).map(mapGarageSaleRow);
     } catch (error) {
       console.error('Error fetching user garage sales:', error);
       throw error;
@@ -301,7 +251,7 @@ export const garageSaleService = {
         throw error;
       }
 
-      return (data || []).map(mapRowToGarageSale);
+      return (data || []).map(mapGarageSaleRow);
     } catch (error) {
       console.error('Error fetching device garage sales:', error);
       throw error;
@@ -334,7 +284,7 @@ export const garageSaleService = {
         throw error;
       }
 
-      return (data || []).map(mapRowToGarageSale);
+      return (data || []).map(mapGarageSaleRow);
     } catch (error) {
       console.error('Error fetching user/device garage sales:', error);
       throw error;
@@ -361,24 +311,3 @@ export const garageSaleService = {
   },
 };
 
-// Helper function to calculate distance between two points (Haversine formula)
-const calculateDistance = (
-  point1: { latitude: number; longitude: number },
-  point2: { latitude: number; longitude: number }
-): number => {
-  const R = 6371; // Earth's radius in kilometers
-  const dLat = toRad(point2.latitude - point1.latitude);
-  const dLon = toRad(point2.longitude - point1.longitude);
-  const lat1 = toRad(point1.latitude);
-  const lat2 = toRad(point2.latitude);
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
-
-const toRad = (value: number): number => {
-  return (value * Math.PI) / 180;
-};

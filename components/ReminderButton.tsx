@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
+import { TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { router } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/contexts/AuthContext';
 import { remindersService } from '@/services/remindersService';
+import { showSignInPrompt, showConfirm, showError, showSuccess, showInfo } from '@/lib/alerts';
 
 interface ReminderButtonProps {
   garageSaleId: string;
@@ -46,16 +47,10 @@ export default function ReminderButton({
 
   const handlePress = async () => {
     if (!isAuthenticated) {
-      Alert.alert(
-        'Sign In Required',
+      showSignInPrompt(
+        router,
         'Please sign in to set reminders for garage sales',
-        [
-          { text: 'Maybe Later', style: 'cancel' },
-          {
-            text: 'Sign In',
-            onPress: () => router.push('/auth/sign-in'),
-          },
-        ]
+        'Sign In Required'
       );
       return;
     }
@@ -64,33 +59,26 @@ export default function ReminderButton({
 
     if (hasReminder) {
       // Remove reminder
-      Alert.alert('Remove Reminder', 'Remove this reminder?', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await remindersService.removeReminder(user.id, garageSaleId);
-              setHasReminder(false);
-              Alert.alert('Success', 'Reminder removed');
-            } catch (error: any) {
-              console.error('Error removing reminder:', error);
-              Alert.alert('Error', 'Failed to remove reminder');
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]);
+      showConfirm('Remove this reminder?', async () => {
+        setLoading(true);
+        try {
+          await remindersService.removeReminder(user.id, garageSaleId);
+          setHasReminder(false);
+          showSuccess('Reminder removed');
+        } catch (error: any) {
+          console.error('Error removing reminder:', error);
+          showError('Failed to remove reminder');
+        } finally {
+          setLoading(false);
+        }
+      }, undefined, 'Remove Reminder');
     } else {
       // Request permission first
       const hasPermission = await remindersService.requestPermissions();
       if (!hasPermission) {
-        Alert.alert(
-          'Permission Required',
-          'Please enable notifications in your device settings to set reminders'
+        showInfo(
+          'Please enable notifications in your device settings to set reminders',
+          'Permission Required'
         );
         return;
       }
@@ -132,10 +120,10 @@ export default function ReminderButton({
     try {
       await remindersService.setReminder(user.id, garageSaleId, date, garageSaleTitle);
       setHasReminder(true);
-      Alert.alert('Success', `Reminder set for ${date.toLocaleString()}`);
+      showSuccess(`Reminder set for ${date.toLocaleString()}`);
     } catch (error: any) {
       console.error('Error setting reminder:', error);
-      Alert.alert('Error', 'Failed to set reminder');
+      showError('Failed to set reminder');
     } finally {
       setLoading(false);
     }

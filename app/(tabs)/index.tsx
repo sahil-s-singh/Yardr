@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { historyService } from '@/services/historyService';
 import FavoriteButton from '@/components/FavoriteButton';
 import ReminderButton from '@/components/ReminderButton';
+import { formatDate, formatTime } from '@/lib/dateUtils';
 
 export default function HomeScreen() {
   const { user, isAuthenticated } = useAuth();
@@ -77,22 +78,6 @@ export default function HomeScreen() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const formatTime = (time: string) => {
-    const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
 
   const handleCalloutPress = (sale: GarageSale) => {
     // Track view if user is authenticated
