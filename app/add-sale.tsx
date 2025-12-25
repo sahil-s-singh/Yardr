@@ -1,6 +1,4 @@
 // app/add-sale.tsx
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import VideoRecorder from "@/components/VideoRecorder";
 import { useAuth } from "@/contexts/AuthContext";
 import { analyzeGarageSaleVideo } from "@/lib/claude";
@@ -20,6 +18,7 @@ import {
 	Platform,
 	ScrollView,
 	StyleSheet,
+	Text,
 	TextInput,
 	TouchableOpacity,
 	View,
@@ -33,12 +32,10 @@ export default function AddSaleScreen() {
 	const [loading, setLoading] = useState(false);
 	const [analyzing, setAnalyzing] = useState(false);
 
-	// Media
 	const [videoUrl, setVideoUrl] = useState<string | null>(null);
 	const [localVideoUri, setLocalVideoUri] = useState<string | null>(null);
 	const [photos, setPhotos] = useState<string[]>([]);
 
-	// Form data
 	const [form, setForm] = useState({
 		title: "",
 		description: "",
@@ -46,32 +43,31 @@ export default function AddSaleScreen() {
 		categories: [] as string[],
 	});
 
-	// Date/Time
 	const [startDate, setStartDate] = useState(new Date());
 	const [endDate, setEndDate] = useState(new Date());
 	const [showStartPicker, setShowStartPicker] = useState(false);
 	const [showEndPicker, setShowEndPicker] = useState(false);
 
-	// Contact info
 	const [contactName, setContactName] = useState("");
 	const [contactPhone, setContactPhone] = useState("");
 	const [contactEmail, setContactEmail] = useState("");
 
-	// Location
 	const [selectedLocation, setSelectedLocation] = useState<{
 		latitude: number;
 		longitude: number;
 	} | null>(null);
 
 	useEffect(() => {
-		// Check if user needs to authenticate
 		if (!isAuthenticated) {
 			Alert.alert(
-				"Authentication Required",
+				"Sign in Required",
 				"Please sign in to create a garage sale listing",
 				[
 					{ text: "Cancel", onPress: () => router.back() },
-					{ text: "Sign In", onPress: () => router.push("/auth/sign-in") },
+					{
+						text: "Sign In",
+						onPress: () => router.push("/auth/sign-in" as any),
+					},
 				]
 			);
 		}
@@ -85,7 +81,6 @@ export default function AddSaleScreen() {
 		setLocalVideoUri(recordedVideoUri);
 
 		try {
-			// Step 1: Get location
 			let address = "";
 			let currentLocation: { latitude: number; longitude: number } | null =
 				null;
@@ -125,7 +120,6 @@ export default function AddSaleScreen() {
 				console.error("Location error:", locationError);
 			}
 
-			// Step 2: Generate thumbnails and analyze with AI
 			const thumbnailPromises = [0, 2500, 4500].map((time) =>
 				VideoThumbnails.getThumbnailAsync(recordedVideoUri, { time })
 			);
@@ -140,7 +134,6 @@ export default function AddSaleScreen() {
 				})
 			);
 
-			// Step 3: Analyze with Claude
 			let analysis;
 			try {
 				analysis = await analyzeGarageSaleVideo(base64Frames);
@@ -153,11 +146,9 @@ export default function AddSaleScreen() {
 				};
 			}
 
-			// Step 4: Upload video
 			const uploadedVideoUrl = await videoService.uploadVideo(recordedVideoUri);
 			setVideoUrl(uploadedVideoUrl);
 
-			// Step 5: Pre-fill form
 			setForm({
 				title: analysis.title,
 				description: analysis.description,
@@ -170,10 +161,6 @@ export default function AddSaleScreen() {
 			}
 
 			setCurrentStep("review");
-			Alert.alert(
-				"✅ Video Analyzed!",
-				"Review the auto-filled information below"
-			);
 		} catch (error: any) {
 			console.error("Error processing video:", error);
 			Alert.alert("Error", "Failed to analyze video. Please try again.");
@@ -200,7 +187,6 @@ export default function AddSaleScreen() {
 	};
 
 	const handlePublish = async () => {
-		// Validation
 		if (!form.title.trim()) {
 			Alert.alert("Error", "Please enter a title");
 			return;
@@ -221,7 +207,6 @@ export default function AddSaleScreen() {
 		setLoading(true);
 
 		try {
-			// Check rate limit
 			const rateCheck = await rateLimitService.checkRateLimit();
 			if (!rateCheck.allowed) {
 				setLoading(false);
@@ -232,7 +217,6 @@ export default function AddSaleScreen() {
 				return;
 			}
 
-			// Get location if not already set
 			let latitude = selectedLocation?.latitude || 52.1332;
 			let longitude = selectedLocation?.longitude || -106.67;
 
@@ -249,7 +233,6 @@ export default function AddSaleScreen() {
 				}
 			}
 
-			// Format dates and times
 			const formatDate = (date: Date) => {
 				const year = date.getFullYear();
 				const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -265,7 +248,6 @@ export default function AddSaleScreen() {
 
 			const deviceId = await rateLimitService.getDeviceId();
 
-			// Create garage sale
 			await garageSaleService.addGarageSale(
 				{
 					title: form.title,
@@ -303,7 +285,6 @@ export default function AddSaleScreen() {
 		}
 	};
 
-	// Step 1: Record Video
 	if (currentStep === "record") {
 		return (
 			<View style={styles.container}>
@@ -311,36 +292,48 @@ export default function AddSaleScreen() {
 					onVideoRecorded={handleVideoRecorded}
 					onCancel={() => router.back()}
 				/>
-				<TouchableOpacity style={styles.skipButton} onPress={handleSkipVideo}>
-					<ThemedText style={styles.skipButtonText}>
-						Skip Video (Fill Manually)
-					</ThemedText>
-				</TouchableOpacity>
+				<View style={styles.recordOverlay}>
+					<View style={styles.recordCard}>
+						<Text style={styles.recordTitle}>Record a 5-second video</Text>
+						<Text style={styles.recordSubtitle}>
+							AI will auto-fill your listing details
+						</Text>
+					</View>
+					<TouchableOpacity
+						style={styles.skipVideoButton}
+						onPress={handleSkipVideo}
+					>
+						<Text style={styles.skipVideoText}>Skip Video (Fill Manually)</Text>
+					</TouchableOpacity>
+				</View>
 			</View>
 		);
 	}
 
-	// Analyzing state
 	if (analyzing) {
 		return (
 			<View style={styles.container}>
-				<ThemedView style={styles.analyzingContainer}>
-					<ThemedText type="title">🤖 Analyzing Video...</ThemedText>
-					<ThemedText style={styles.analyzingText}>
-						AI is processing your video
-					</ThemedText>
-				</ThemedView>
+				<View style={styles.analyzingContainer}>
+					<Text style={styles.analyzingTitle}>🤖 Analyzing Video...</Text>
+					<Text style={styles.analyzingText}>AI is processing your video</Text>
+				</View>
 			</View>
 		);
 	}
 
-	// Step 2: Review
 	if (currentStep === "review") {
 		return (
 			<View style={styles.container}>
-				<ThemedView style={styles.header}>
-					<ThemedText type="title">Review AI Results</ThemedText>
-				</ThemedView>
+				<View style={styles.header}>
+					<TouchableOpacity
+						onPress={() => router.back()}
+						style={styles.backButton}
+					>
+						<Text style={styles.backText}>✕</Text>
+					</TouchableOpacity>
+					<Text style={styles.headerTitle}>Review AI Results</Text>
+					<View style={styles.placeholder} />
+				</View>
 
 				<ScrollView
 					style={styles.scrollView}
@@ -356,70 +349,65 @@ export default function AddSaleScreen() {
 						/>
 					)}
 
-					<View style={styles.aiResultsCard}>
-						<ThemedText style={styles.sectionTitle}>✨ AI Generated</ThemedText>
+					<View style={styles.aiCard}>
+						<Text style={styles.aiTitle}>✨ AI Generated</Text>
 
-						<View style={styles.resultRow}>
-							<ThemedText style={styles.resultLabel}>Title:</ThemedText>
-							<ThemedText style={styles.resultText}>{form.title}</ThemedText>
+						<View style={styles.aiRow}>
+							<Text style={styles.aiLabel}>Title</Text>
+							<Text style={styles.aiValue}>{form.title}</Text>
 						</View>
 
-						<View style={styles.resultRow}>
-							<ThemedText style={styles.resultLabel}>Tags:</ThemedText>
+						<View style={styles.aiRow}>
+							<Text style={styles.aiLabel}>Tags</Text>
 							<View style={styles.tagsContainer}>
 								{form.categories.map((cat, idx) => (
 									<View key={idx} style={styles.tag}>
-										<ThemedText style={styles.tagText}>{cat}</ThemedText>
+										<Text style={styles.tagText}>{cat}</Text>
 									</View>
 								))}
 							</View>
 						</View>
 
-						<View style={styles.resultRow}>
-							<ThemedText style={styles.resultLabel}>Description:</ThemedText>
-							<ThemedText style={styles.resultText}>
-								{form.description}
-							</ThemedText>
+						<View style={styles.aiRow}>
+							<Text style={styles.aiLabel}>Description</Text>
+							<Text style={styles.aiValue}>{form.description}</Text>
 						</View>
 
 						{form.address && (
-							<View style={styles.resultRow}>
-								<ThemedText style={styles.resultLabel}>Location:</ThemedText>
-								<ThemedText style={styles.resultText}>
-									{form.address}
-								</ThemedText>
+							<View style={styles.aiRow}>
+								<Text style={styles.aiLabel}>Location</Text>
+								<Text style={styles.aiValue}>{form.address}</Text>
 							</View>
 						)}
 					</View>
 
 					<TouchableOpacity
-						style={styles.uploadPhotosButton}
+						style={styles.uploadButton}
 						onPress={handleUploadPhotos}
 					>
-						<ThemedText style={styles.uploadPhotosText}>
-							📸 Upload Additional Photos ({photos.length})
-						</ThemedText>
+						<Text style={styles.uploadIcon}>📸</Text>
+						<Text style={styles.uploadText}>
+							Upload Additional Photos ({photos.length})
+						</Text>
 					</TouchableOpacity>
 
 					<View style={styles.buttonRow}>
 						<TouchableOpacity
-							style={[styles.button, styles.secondaryButton]}
+							style={styles.secondaryButton}
 							onPress={() => {
 								setCurrentStep("record");
 								setVideoUrl(null);
 								setLocalVideoUri(null);
 							}}
 						>
-							<ThemedText style={styles.secondaryButtonText}>
-								Re-record
-							</ThemedText>
+							<Text style={styles.secondaryButtonText}>Re-record</Text>
 						</TouchableOpacity>
 
 						<TouchableOpacity
-							style={[styles.button, styles.primaryButton]}
+							style={styles.primaryButton}
 							onPress={() => setCurrentStep("publish")}
 						>
-							<ThemedText style={styles.primaryButtonText}>Continue</ThemedText>
+							<Text style={styles.primaryButtonText}>Continue</Text>
 						</TouchableOpacity>
 					</View>
 				</ScrollView>
@@ -427,128 +415,136 @@ export default function AddSaleScreen() {
 		);
 	}
 
-	// Step 3: Publish
 	return (
 		<View style={styles.container}>
-			<ThemedView style={styles.header}>
-				<ThemedText type="title">Publish Sale</ThemedText>
-			</ThemedView>
+			<View style={styles.header}>
+				<TouchableOpacity
+					onPress={() => router.back()}
+					style={styles.backButton}
+				>
+					<Text style={styles.backText}>✕</Text>
+				</TouchableOpacity>
+				<Text style={styles.headerTitle}>Publish Sale</Text>
+				<View style={styles.placeholder} />
+			</View>
 
 			<ScrollView
 				style={styles.scrollView}
 				contentContainerStyle={styles.scrollContent}
 			>
-				<View style={styles.section}>
-					<ThemedText style={styles.label}>Sale Title *</ThemedText>
-					<TextInput
-						style={styles.input}
-						value={form.title}
-						onChangeText={(text) => setForm({ ...form, title: text })}
-						placeholder="e.g., Moving Sale"
-						placeholderTextColor="#999"
-					/>
-				</View>
-
-				<View style={styles.section}>
-					<ThemedText style={styles.label}>Description *</ThemedText>
-					<TextInput
-						style={[styles.input, styles.textArea]}
-						value={form.description}
-						onChangeText={(text) => setForm({ ...form, description: text })}
-						placeholder="Describe items for sale..."
-						placeholderTextColor="#999"
-						multiline
-						numberOfLines={4}
-					/>
-				</View>
-
-				<View style={styles.section}>
-					<ThemedText style={styles.label}>Address *</ThemedText>
-					<TextInput
-						style={styles.input}
-						value={form.address}
-						onChangeText={(text) => setForm({ ...form, address: text })}
-						placeholder="123 Main St, City"
-						placeholderTextColor="#999"
-					/>
-				</View>
-
-				<View style={styles.section}>
-					<ThemedText style={styles.label}>Start Date & Time *</ThemedText>
-					<TouchableOpacity
-						style={styles.dateButton}
-						onPress={() => setShowStartPicker(true)}
-					>
-						<ThemedText>{startDate.toLocaleString()}</ThemedText>
-					</TouchableOpacity>
-					{showStartPicker && (
-						<DateTimePicker
-							value={startDate}
-							mode="datetime"
-							display="default"
-							onChange={(event, date) => {
-								setShowStartPicker(Platform.OS === "ios");
-								if (date) setStartDate(date);
-							}}
+				<View style={styles.formCard}>
+					<View style={styles.inputGroup}>
+						<Text style={styles.inputLabel}>Sale Title *</Text>
+						<TextInput
+							style={styles.input}
+							value={form.title}
+							onChangeText={(text) => setForm({ ...form, title: text })}
+							placeholder="e.g., Moving Sale"
+							placeholderTextColor="#666"
 						/>
-					)}
-				</View>
+					</View>
 
-				<View style={styles.section}>
-					<ThemedText style={styles.label}>End Date & Time *</ThemedText>
-					<TouchableOpacity
-						style={styles.dateButton}
-						onPress={() => setShowEndPicker(true)}
-					>
-						<ThemedText>{endDate.toLocaleString()}</ThemedText>
-					</TouchableOpacity>
-					{showEndPicker && (
-						<DateTimePicker
-							value={endDate}
-							mode="datetime"
-							display="default"
-							onChange={(event, date) => {
-								setShowEndPicker(Platform.OS === "ios");
-								if (date) setEndDate(date);
-							}}
+					<View style={styles.inputGroup}>
+						<Text style={styles.inputLabel}>Description *</Text>
+						<TextInput
+							style={[styles.input, styles.textArea]}
+							value={form.description}
+							onChangeText={(text) => setForm({ ...form, description: text })}
+							placeholder="Describe items for sale..."
+							placeholderTextColor="#666"
+							multiline
+							numberOfLines={4}
 						/>
-					)}
-				</View>
+					</View>
 
-				<View style={styles.section}>
-					<ThemedText style={styles.label}>Your Name *</ThemedText>
-					<TextInput
-						style={styles.input}
-						value={contactName}
-						onChangeText={setContactName}
-						placeholder="John Doe"
-						placeholderTextColor="#999"
-					/>
-				</View>
+					<View style={styles.inputGroup}>
+						<Text style={styles.inputLabel}>Address *</Text>
+						<TextInput
+							style={styles.input}
+							value={form.address}
+							onChangeText={(text) => setForm({ ...form, address: text })}
+							placeholder="123 Main St, City"
+							placeholderTextColor="#666"
+						/>
+					</View>
 
-				<View style={styles.section}>
-					<ThemedText style={styles.label}>Phone Number</ThemedText>
-					<TextInput
-						style={styles.input}
-						value={contactPhone}
-						onChangeText={setContactPhone}
-						placeholder="306-555-0123"
-						placeholderTextColor="#999"
-						keyboardType="phone-pad"
-					/>
-				</View>
+					<View style={styles.inputGroup}>
+						<Text style={styles.inputLabel}>Start Date & Time *</Text>
+						<TouchableOpacity
+							style={styles.dateInput}
+							onPress={() => setShowStartPicker(true)}
+						>
+							<Text style={styles.dateText}>{startDate.toLocaleString()}</Text>
+						</TouchableOpacity>
+						{showStartPicker && (
+							<DateTimePicker
+								value={startDate}
+								mode="datetime"
+								display="default"
+								onChange={(event, date) => {
+									setShowStartPicker(Platform.OS === "ios");
+									if (date) setStartDate(date);
+								}}
+							/>
+						)}
+					</View>
 
-				<View style={styles.section}>
-					<ThemedText style={styles.label}>Email</ThemedText>
-					<TextInput
-						style={styles.input}
-						value={contactEmail}
-						onChangeText={setContactEmail}
-						placeholder="your@email.com"
-						placeholderTextColor="#999"
-						keyboardType="email-address"
-						autoCapitalize="none"
-					/>
+					<View style={styles.inputGroup}>
+						<Text style={styles.inputLabel}>End Date & Time *</Text>
+						<TouchableOpacity
+							style={styles.dateInput}
+							onPress={() => setShowEndPicker(true)}
+						>
+							<Text style={styles.dateText}>{endDate.toLocaleString()}</Text>
+						</TouchableOpacity>
+						{showEndPicker && (
+							<DateTimePicker
+								value={endDate}
+								mode="datetime"
+								display="default"
+								onChange={(event, date) => {
+									setShowEndPicker(Platform.OS === "ios");
+									if (date) setEndDate(date);
+								}}
+							/>
+						)}
+					</View>
+
+					<View style={styles.inputGroup}>
+						<Text style={styles.inputLabel}>Your Name *</Text>
+						<TextInput
+							style={styles.input}
+							value={contactName}
+							onChangeText={setContactName}
+							placeholder="John Doe"
+							placeholderTextColor="#666"
+						/>
+					</View>
+
+					<View style={styles.inputGroup}>
+						<Text style={styles.inputLabel}>Phone Number</Text>
+						<TextInput
+							style={styles.input}
+							value={contactPhone}
+							onChangeText={setContactPhone}
+							placeholder="306-555-0123"
+							placeholderTextColor="#666"
+							keyboardType="phone-pad"
+						/>
+					</View>
+
+					<View style={styles.inputGroup}>
+						<Text style={styles.inputLabel}>Email</Text>
+						<TextInput
+							style={styles.input}
+							value={contactEmail}
+							onChangeText={setContactEmail}
+							placeholder="your@email.com"
+							placeholderTextColor="#666"
+							keyboardType="email-address"
+							autoCapitalize="none"
+						/>
+					</View>
 				</View>
 
 				<TouchableOpacity
@@ -559,9 +555,10 @@ export default function AddSaleScreen() {
 					onPress={handlePublish}
 					disabled={loading}
 				>
-					<ThemedText style={styles.publishButtonText}>
-						{loading ? "Publishing..." : "🚀 Publish Sale"}
-					</ThemedText>
+					<Text style={styles.publishIcon}>🚀</Text>
+					<Text style={styles.publishButtonText}>
+						{loading ? "Publishing..." : "Publish Sale"}
+					</Text>
 				</TouchableOpacity>
 			</ScrollView>
 		</View>
@@ -571,12 +568,34 @@ export default function AddSaleScreen() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+		backgroundColor: "#0A0A0A",
 	},
 	header: {
-		padding: 20,
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		paddingHorizontal: 20,
 		paddingTop: 60,
-		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
+		paddingBottom: 20,
+		backgroundColor: "#0A0A0A",
+	},
+	backButton: {
+		width: 40,
+		height: 40,
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	backText: {
+		fontSize: 24,
+		color: "#FFF",
+	},
+	headerTitle: {
+		fontSize: 20,
+		fontWeight: "bold",
+		color: "#FFF",
+	},
+	placeholder: {
+		width: 40,
 	},
 	scrollView: {
 		flex: 1,
@@ -585,158 +604,214 @@ const styles = StyleSheet.create({
 		padding: 20,
 		paddingBottom: 40,
 	},
+	recordOverlay: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		justifyContent: "space-between",
+		paddingTop: 80,
+		paddingBottom: 40,
+		paddingHorizontal: 20,
+	},
+	recordCard: {
+		backgroundColor: "rgba(0, 0, 0, 0.85)",
+		padding: 20,
+		borderRadius: 16,
+		alignItems: "center",
+	},
+	recordTitle: {
+		fontSize: 20,
+		fontWeight: "bold",
+		color: "#FFF",
+		marginBottom: 8,
+	},
+	recordSubtitle: {
+		fontSize: 14,
+		color: "#999",
+		textAlign: "center",
+	},
+	skipVideoButton: {
+		backgroundColor: "rgba(255, 255, 255, 0.15)",
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		borderRadius: 12,
+		alignItems: "center",
+	},
+	skipVideoText: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#FFF",
+	},
 	analyzingContainer: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
 		padding: 40,
 	},
+	analyzingTitle: {
+		fontSize: 24,
+		fontWeight: "bold",
+		color: "#FFF",
+		marginBottom: 12,
+	},
 	analyzingText: {
 		fontSize: 16,
-		marginTop: 10,
-		opacity: 0.7,
+		color: "#999",
 	},
 	videoPreview: {
 		width: "100%",
 		height: 200,
-		borderRadius: 12,
+		borderRadius: 16,
+		marginBottom: 20,
+		backgroundColor: "#1A1A1A",
+	},
+	aiCard: {
+		backgroundColor: "#1A1A1A",
+		padding: 20,
+		borderRadius: 16,
 		marginBottom: 20,
 	},
-	aiResultsCard: {
-		backgroundColor: "#E3F2FD",
-		padding: 16,
-		borderRadius: 12,
-		marginBottom: 20,
-	},
-	sectionTitle: {
+	aiTitle: {
 		fontSize: 18,
 		fontWeight: "bold",
-		marginBottom: 12,
+		color: "#FFF",
+		marginBottom: 16,
 	},
-	resultRow: {
-		marginBottom: 12,
+	aiRow: {
+		marginBottom: 16,
 	},
-	resultLabel: {
+	aiLabel: {
 		fontSize: 12,
-		textTransform: "uppercase",
-		opacity: 0.6,
-		marginBottom: 4,
 		fontWeight: "600",
+		color: "#999",
+		textTransform: "uppercase",
+		marginBottom: 8,
 	},
-	resultText: {
+	aiValue: {
 		fontSize: 15,
+		color: "#FFF",
 	},
 	tagsContainer: {
 		flexDirection: "row",
 		flexWrap: "wrap",
-		gap: 6,
-		marginTop: 4,
+		gap: 8,
 	},
 	tag: {
-		backgroundColor: "#1976D2",
-		paddingHorizontal: 10,
-		paddingVertical: 4,
+		backgroundColor: "#007AFF",
+		paddingHorizontal: 12,
+		paddingVertical: 6,
 		borderRadius: 12,
 	},
 	tagText: {
-		color: "#fff",
-		fontSize: 12,
+		fontSize: 13,
+		color: "#FFF",
 		fontWeight: "500",
 	},
-	uploadPhotosButton: {
-		backgroundColor: "#FF9500",
-		padding: 16,
-		borderRadius: 12,
+	uploadButton: {
+		flexDirection: "row",
 		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "#FF8C42",
+		paddingVertical: 16,
+		borderRadius: 12,
 		marginBottom: 20,
+		gap: 8,
 	},
-	uploadPhotosText: {
-		color: "#fff",
+	uploadIcon: {
+		fontSize: 20,
+	},
+	uploadText: {
 		fontSize: 16,
-		fontWeight: "bold",
+		fontWeight: "600",
+		color: "#FFF",
 	},
 	buttonRow: {
 		flexDirection: "row",
 		gap: 12,
-		marginBottom: 20,
 	},
-	button: {
+	primaryButton: {
 		flex: 1,
-		padding: 16,
+		backgroundColor: "#007AFF",
+		paddingVertical: 16,
 		borderRadius: 12,
 		alignItems: "center",
 	},
-	primaryButton: {
-		backgroundColor: "#0066FF",
-	},
 	primaryButtonText: {
-		color: "#fff",
 		fontSize: 16,
-		fontWeight: "bold",
+		fontWeight: "600",
+		color: "#FFF",
 	},
 	secondaryButton: {
-		backgroundColor: "#f0f0f0",
+		flex: 1,
+		backgroundColor: "#2A2A2A",
+		paddingVertical: 16,
+		borderRadius: 12,
+		alignItems: "center",
 	},
 	secondaryButtonText: {
-		color: "#333",
 		fontSize: 16,
-		fontWeight: "bold",
+		fontWeight: "600",
+		color: "#FFF",
 	},
-	section: {
+	formCard: {
+		backgroundColor: "#1A1A1A",
+		padding: 20,
+		borderRadius: 16,
 		marginBottom: 20,
 	},
-	label: {
-		fontSize: 16,
-		fontWeight: "bold",
+	inputGroup: {
+		marginBottom: 20,
+	},
+	inputLabel: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: "#FFF",
 		marginBottom: 8,
 	},
 	input: {
-		backgroundColor: "white",
+		backgroundColor: "#2A2A2A",
 		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		padding: 12,
+		borderColor: "#3A3A3A",
+		borderRadius: 12,
+		padding: 14,
 		fontSize: 16,
+		color: "#FFF",
 	},
 	textArea: {
 		height: 100,
 		textAlignVertical: "top",
 	},
-	dateButton: {
-		backgroundColor: "white",
+	dateInput: {
+		backgroundColor: "#2A2A2A",
 		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		padding: 12,
+		borderColor: "#3A3A3A",
+		borderRadius: 12,
+		padding: 14,
+	},
+	dateText: {
+		fontSize: 16,
+		color: "#FFF",
 	},
 	publishButton: {
-		backgroundColor: "#34C759",
-		padding: 18,
-		borderRadius: 12,
+		flexDirection: "row",
 		alignItems: "center",
-		marginTop: 20,
+		justifyContent: "center",
+		backgroundColor: "#34C759",
+		paddingVertical: 18,
+		borderRadius: 12,
+		gap: 8,
 	},
 	publishButtonDisabled: {
 		opacity: 0.6,
 	},
+	publishIcon: {
+		fontSize: 20,
+	},
 	publishButtonText: {
-		color: "#fff",
 		fontSize: 18,
 		fontWeight: "bold",
-	},
-	skipButton: {
-		position: "absolute",
-		bottom: 100,
-		left: 20,
-		right: 20,
-		backgroundColor: "rgba(0, 0, 0, 0.7)",
-		padding: 16,
-		borderRadius: 12,
-		alignItems: "center",
-	},
-	skipButtonText: {
-		color: "#fff",
-		fontSize: 16,
-		fontWeight: "600",
+		color: "#FFF",
 	},
 });

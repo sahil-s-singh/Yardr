@@ -37,6 +37,10 @@ export default function RootLayout() {
 							headerShown: true,
 							title: "Sale Details",
 							presentation: "card",
+							headerStyle: {
+								backgroundColor: "#0A0A0A",
+							},
+							headerTintColor: "#FFF",
 						}}
 					/>
 
@@ -52,48 +56,90 @@ export default function RootLayout() {
 					{/* Auth Screens */}
 					<Stack.Screen
 						name="auth/sign-in"
-						options={{ headerShown: true, title: "Sign In" }}
+						options={{
+							headerShown: true,
+							title: "Sign In",
+							headerStyle: {
+								backgroundColor: "#0A0A0A",
+							},
+							headerTintColor: "#FFF",
+						}}
 					/>
 					<Stack.Screen
 						name="auth/sign-up"
-						options={{ headerShown: true, title: "Sign Up" }}
+						options={{
+							headerShown: true,
+							title: "Sign Up",
+							headerStyle: {
+								backgroundColor: "#0A0A0A",
+							},
+							headerTintColor: "#FFF",
+						}}
 					/>
 
-					{/* User Features */}
-					<Stack.Screen
-						name="favorites"
-						options={{ headerShown: true, title: "My Favorites" }}
-					/>
-					<Stack.Screen
-						name="reminders"
-						options={{ headerShown: true, title: "My Reminders" }}
-					/>
-					<Stack.Screen
-						name="history"
-						options={{ headerShown: true, title: "View History" }}
-					/>
+					{/* User Features - These files should exist in your app/ folder */}
 					<Stack.Screen
 						name="my-sales"
-						options={{ headerShown: true, title: "My Garage Sales" }}
+						options={{
+							headerShown: true,
+							title: "My Garage Sales",
+							headerStyle: {
+								backgroundColor: "#0A0A0A",
+							},
+							headerTintColor: "#FFF",
+						}}
 					/>
 
 					{/* Edit Features */}
 					<Stack.Screen
 						name="edit-sale/[id]"
-						options={{ headerShown: true, title: "Edit Sale" }}
+						options={{
+							headerShown: true,
+							title: "Edit Sale",
+							headerStyle: {
+								backgroundColor: "#0A0A0A",
+							},
+							headerTintColor: "#FFF",
+						}}
 					/>
 					<Stack.Screen
 						name="add-video/[id]"
-						options={{ headerShown: true, title: "Add Video" }}
+						options={{
+							headerShown: true,
+							title: "Add Video",
+							headerStyle: {
+								backgroundColor: "#0A0A0A",
+							},
+							headerTintColor: "#FFF",
+						}}
 					/>
 
-					{/* Keep old route for backward compatibility */}
+					{/* Keep old routes for backward compatibility */}
 					<Stack.Screen
 						name="add-garage-sale"
-						options={{ headerShown: false }}
+						options={{
+							headerShown: false,
+							headerStyle: {
+								backgroundColor: "#0A0A0A",
+							},
+							headerTintColor: "#FFF",
+						}}
+					/>
+
+					{/* Modal and other screens */}
+					<Stack.Screen
+						name="modal"
+						options={{
+							presentation: "modal",
+							title: "Modal",
+							headerStyle: {
+								backgroundColor: "#0A0A0A",
+							},
+							headerTintColor: "#FFF",
+						}}
 					/>
 				</Stack>
-				<StatusBar style="auto" />
+				<StatusBar style="light" />
 			</ThemeProvider>
 		</AuthProvider>
 	);

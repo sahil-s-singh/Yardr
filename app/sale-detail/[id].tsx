@@ -1,8 +1,6 @@
 // app/sale-detail/[id].tsx
 import FavoriteButton from "@/components/FavoriteButton";
 import ReminderButton from "@/components/ReminderButton";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { useAuth } from "@/contexts/AuthContext";
 import { garageSaleService } from "@/services/garageSaleService";
 import { historyService } from "@/services/historyService";
@@ -19,6 +17,7 @@ import {
 	Platform,
 	ScrollView,
 	StyleSheet,
+	Text,
 	TouchableOpacity,
 	View,
 } from "react-native";
@@ -46,7 +45,6 @@ export default function SaleDetailScreen() {
 			if (saleData) {
 				setSale(saleData);
 
-				// Track view if authenticated
 				if (isAuthenticated && user) {
 					historyService.recordView(user.id, id as string);
 				}
@@ -94,9 +92,9 @@ export default function SaleDetailScreen() {
 		const distance = R * c;
 
 		if (distance < 1) {
-			return `${Math.round(distance * 1000)}m away`;
+			return `${Math.round(distance * 1000)} ft`;
 		}
-		return `${distance.toFixed(1)}km away`;
+		return `${distance.toFixed(1)} km`;
 	};
 
 	const toRad = (value: number): number => {
@@ -126,8 +124,7 @@ export default function SaleDetailScreen() {
 			Alert.alert("No Phone", "No phone number provided for this sale");
 			return;
 		}
-		const phoneUrl = `tel:${sale.contactPhone}`;
-		Linking.openURL(phoneUrl);
+		Linking.openURL(`tel:${sale.contactPhone}`);
 	};
 
 	const handleEmail = () => {
@@ -135,8 +132,9 @@ export default function SaleDetailScreen() {
 			Alert.alert("No Email", "No email address provided for this sale");
 			return;
 		}
-		const emailUrl = `mailto:${sale.contactEmail}?subject=Inquiry about ${sale.title}`;
-		Linking.openURL(emailUrl);
+		Linking.openURL(
+			`mailto:${sale.contactEmail}?subject=Inquiry about ${sale.title}`
+		);
 	};
 
 	const handleGetDirections = () => {
@@ -157,9 +155,9 @@ export default function SaleDetailScreen() {
 	if (loading) {
 		return (
 			<View style={styles.container}>
-				<ThemedView style={styles.loadingContainer}>
-					<ThemedText>Loading...</ThemedText>
-				</ThemedView>
+				<View style={styles.loadingContainer}>
+					<Text style={styles.loadingText}>Loading...</Text>
+				</View>
 			</View>
 		);
 	}
@@ -172,159 +170,140 @@ export default function SaleDetailScreen() {
 		<View style={styles.container}>
 			<ScrollView contentContainerStyle={styles.content}>
 				{/* Media Section */}
-				{sale.videoUrl && (
-					<Video
-						source={{ uri: sale.videoUrl }}
-						style={styles.video}
-						resizeMode={ResizeMode.COVER}
-						useNativeControls
-						isLooping
-					/>
-				)}
+				<View style={styles.mediaContainer}>
+					{sale.videoUrl ? (
+						<Video
+							source={{ uri: sale.videoUrl }}
+							style={styles.video}
+							resizeMode={ResizeMode.COVER}
+							useNativeControls
+							isLooping
+						/>
+					) : sale.images && sale.images.length > 0 ? (
+						<Image
+							source={{ uri: sale.images[0] }}
+							style={styles.video}
+							contentFit="cover"
+						/>
+					) : (
+						<View style={[styles.video, styles.noMedia]}>
+							<Text style={styles.noMediaText}>📦</Text>
+						</View>
+					)}
+				</View>
 
-				{!sale.videoUrl && sale.images && sale.images.length > 0 && (
-					<ScrollView
-						horizontal
-						pagingEnabled
-						showsHorizontalScrollIndicator={false}
-					>
-						{sale.images.map((image, idx) => (
-							<Image
-								key={idx}
-								source={{ uri: image }}
-								style={styles.image}
-								contentFit="cover"
-							/>
-						))}
-					</ScrollView>
-				)}
-
-				{!sale.videoUrl && (!sale.images || sale.images.length === 0) && (
-					<View style={[styles.video, styles.noMedia]}>
-						<ThemedText style={styles.noMediaText}>📦</ThemedText>
-					</View>
-				)}
-
-				{/* Content Section */}
-				<ThemedView style={styles.details}>
+				{/* Content Card */}
+				<View style={styles.detailsCard}>
 					{/* Title */}
-					<ThemedText type="title" style={styles.title}>
-						{sale.title}
-					</ThemedText>
+					<Text style={styles.title}>{sale.title}</Text>
 
-					{/* Date & Time */}
-					<View style={styles.infoRow}>
-						<ThemedText style={styles.icon}>📅</ThemedText>
-						<View style={styles.infoContent}>
-							<ThemedText style={styles.infoLabel}>When</ThemedText>
-							<ThemedText style={styles.infoText}>
-								{formatDate(sale.date)}
-							</ThemedText>
-							<ThemedText style={styles.infoText}>
-								{formatTime(sale.startTime)} - {formatTime(sale.endTime)}
-							</ThemedText>
+					{/* Date & Time Section */}
+					<View style={styles.infoSection}>
+						<View style={styles.infoHeader}>
+							<Text style={styles.infoIcon}>📅</Text>
+							<Text style={styles.infoTitle}>When</Text>
 						</View>
+						<Text style={styles.infoValue}>{formatDate(sale.date)}</Text>
+						<Text style={styles.infoValue}>
+							{formatTime(sale.startTime)} - {formatTime(sale.endTime)}
+						</Text>
 					</View>
 
-					{/* Location */}
-					<View style={styles.infoRow}>
-						<ThemedText style={styles.icon}>📍</ThemedText>
-						<View style={styles.infoContent}>
-							<ThemedText style={styles.infoLabel}>Location</ThemedText>
-							<ThemedText style={styles.infoText}>
-								{sale.location.address}
-							</ThemedText>
-							<ThemedText style={styles.distanceText}>
-								{calculateDistance()}
-							</ThemedText>
+					{/* Location Section */}
+					<View style={styles.infoSection}>
+						<View style={styles.infoHeader}>
+							<Text style={styles.infoIcon}>📍</Text>
+							<Text style={styles.infoTitle}>Location</Text>
 						</View>
+						<Text style={styles.infoValue}>{sale.location.address}</Text>
+						<Text style={styles.distanceText}>{calculateDistance()} away</Text>
 					</View>
 
-					{/* Categories/Tags */}
+					{/* Categories Section */}
 					{sale.categories && sale.categories.length > 0 && (
-						<View style={styles.infoRow}>
-							<ThemedText style={styles.icon}>🏷️</ThemedText>
-							<View style={styles.infoContent}>
-								<ThemedText style={styles.infoLabel}>Categories</ThemedText>
-								<View style={styles.categoriesContainer}>
-									{sale.categories.map((cat, idx) => (
-										<View key={idx} style={styles.categoryTag}>
-											<ThemedText style={styles.categoryText}>{cat}</ThemedText>
-										</View>
-									))}
-								</View>
+						<View style={styles.infoSection}>
+							<View style={styles.infoHeader}>
+								<Text style={styles.infoIcon}>🏷️</Text>
+								<Text style={styles.infoTitle}>Categories</Text>
+							</View>
+							<View style={styles.tagsContainer}>
+								{sale.categories.map((cat, idx) => (
+									<View key={idx} style={styles.tag}>
+										<Text style={styles.tagText}>{cat}</Text>
+									</View>
+								))}
 							</View>
 						</View>
 					)}
 
-					{/* Description */}
+					{/* Description Section */}
 					{sale.description && (
-						<View style={styles.infoRow}>
-							<ThemedText style={styles.icon}>📝</ThemedText>
-							<View style={styles.infoContent}>
-								<ThemedText style={styles.infoLabel}>Description</ThemedText>
-								<ThemedText style={styles.descriptionText}>
-									{sale.description}
-								</ThemedText>
+						<View style={styles.infoSection}>
+							<View style={styles.infoHeader}>
+								<Text style={styles.infoIcon}>📝</Text>
+								<Text style={styles.infoTitle}>Description</Text>
 							</View>
+							<Text style={styles.descriptionText}>{sale.description}</Text>
 						</View>
 					)}
 
-					{/* Contact */}
-					<View style={styles.infoRow}>
-						<ThemedText style={styles.icon}>👤</ThemedText>
-						<View style={styles.infoContent}>
-							<ThemedText style={styles.infoLabel}>Contact</ThemedText>
-							<ThemedText style={styles.infoText}>
-								{sale.contactName}
-							</ThemedText>
+					{/* Contact Section */}
+					<View style={styles.infoSection}>
+						<View style={styles.infoHeader}>
+							<Text style={styles.infoIcon}>👤</Text>
+							<Text style={styles.infoTitle}>Contact</Text>
 						</View>
+						<Text style={styles.infoValue}>{sale.contactName}</Text>
 					</View>
+				</View>
 
-					{/* Action Buttons */}
-					<View style={styles.actionsContainer}>
-						<TouchableOpacity
-							style={styles.actionButton}
-							onPress={handleGetDirections}
-						>
-							<ThemedText style={styles.actionButtonText}>
-								🗺️ Directions
-							</ThemedText>
-						</TouchableOpacity>
+				{/* Action Buttons */}
+				<View style={styles.actionsCard}>
+					<TouchableOpacity
+						style={styles.primaryButton}
+						onPress={handleGetDirections}
+						activeOpacity={0.8}
+					>
+						<Text style={styles.buttonIcon}>🗺️</Text>
+						<Text style={styles.primaryButtonText}>Get Directions</Text>
+					</TouchableOpacity>
 
+					<View style={styles.secondaryButtons}>
 						{sale.contactPhone && (
 							<TouchableOpacity
-								style={styles.actionButton}
+								style={styles.secondaryButton}
 								onPress={handleCall}
+								activeOpacity={0.8}
 							>
-								<ThemedText style={styles.actionButtonText}>📞 Call</ThemedText>
+								<Text style={styles.buttonIcon}>📞</Text>
+								<Text style={styles.secondaryButtonText}>Call</Text>
 							</TouchableOpacity>
 						)}
 
 						{sale.contactEmail && (
 							<TouchableOpacity
-								style={styles.actionButton}
+								style={styles.secondaryButton}
 								onPress={handleEmail}
+								activeOpacity={0.8}
 							>
-								<ThemedText style={styles.actionButtonText}>
-									✉️ Email
-								</ThemedText>
+								<Text style={styles.buttonIcon}>✉️</Text>
+								<Text style={styles.secondaryButtonText}>Email</Text>
 							</TouchableOpacity>
 						)}
 					</View>
+				</View>
 
-					{/* Favorite & Reminder */}
-					<View style={styles.savedActionsContainer}>
-						<FavoriteButton garageSaleId={sale.id} size={24} showLabel />
-						<ReminderButton
-							garageSaleId={sale.id}
-							garageSaleTitle={sale.title}
-							garageSaleDate={sale.startDate || sale.date}
-							size={24}
-							showLabel
-						/>
-					</View>
-				</ThemedView>
+				{/* Save Actions */}
+				<View style={styles.saveActionsCard}>
+					<FavoriteButton garageSaleId={sale.id} size={24} showLabel />
+					<ReminderButton
+						garageSaleId={sale.id}
+						garageSaleTitle={sale.title}
+						garageSaleDate={sale.startDate || sale.date}
+						size={24}
+						showLabel
+					/>
+				</View>
 			</ScrollView>
 		</View>
 	);
@@ -333,117 +312,151 @@ export default function SaleDetailScreen() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+		backgroundColor: "#0A0A0A",
 	},
 	loadingContainer: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
 	},
+	loadingText: {
+		fontSize: 16,
+		color: "#999",
+	},
 	content: {
 		paddingBottom: 40,
 	},
-	video: {
+	mediaContainer: {
 		width: width,
-		height: 250,
-		backgroundColor: "#000",
+		height: 280,
+		backgroundColor: "#1A1A1A",
 	},
-	image: {
-		width: width,
-		height: 250,
+	video: {
+		width: "100%",
+		height: "100%",
 	},
 	noMedia: {
 		justifyContent: "center",
 		alignItems: "center",
-		backgroundColor: "#f0f0f0",
 	},
 	noMediaText: {
 		fontSize: 64,
 		opacity: 0.3,
 	},
-	details: {
+	detailsCard: {
+		backgroundColor: "#1A1A1A",
+		margin: 20,
+		marginBottom: 12,
 		padding: 20,
+		borderRadius: 16,
 	},
 	title: {
+		fontSize: 24,
+		fontWeight: "bold",
+		color: "#FFF",
 		marginBottom: 24,
 	},
-	infoRow: {
-		flexDirection: "row",
+	infoSection: {
 		marginBottom: 20,
 	},
-	icon: {
-		fontSize: 24,
-		marginRight: 12,
-		width: 32,
+	infoHeader: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 8,
+		marginBottom: 8,
 	},
-	infoContent: {
-		flex: 1,
+	infoIcon: {
+		fontSize: 18,
 	},
-	infoLabel: {
+	infoTitle: {
 		fontSize: 12,
-		textTransform: "uppercase",
-		opacity: 0.6,
-		marginBottom: 4,
 		fontWeight: "600",
+		color: "#999",
+		textTransform: "uppercase",
 		letterSpacing: 0.5,
 	},
-	infoText: {
+	infoValue: {
 		fontSize: 16,
-		marginBottom: 2,
+		color: "#FFF",
+		marginBottom: 4,
 	},
 	distanceText: {
 		fontSize: 14,
-		opacity: 0.7,
+		color: "#999",
 		marginTop: 4,
 	},
 	descriptionText: {
 		fontSize: 15,
 		lineHeight: 22,
-		opacity: 0.9,
+		color: "#CCC",
 	},
-	categoriesContainer: {
+	tagsContainer: {
 		flexDirection: "row",
 		flexWrap: "wrap",
 		gap: 8,
-		marginTop: 4,
 	},
-	categoryTag: {
-		backgroundColor: "#E3F2FD",
+	tag: {
+		backgroundColor: "#2A2A2A",
 		paddingHorizontal: 12,
 		paddingVertical: 6,
-		borderRadius: 16,
+		borderRadius: 12,
 	},
-	categoryText: {
+	tagText: {
 		fontSize: 13,
-		color: "#1976D2",
+		color: "#999",
 		fontWeight: "500",
 	},
-	actionsContainer: {
+	actionsCard: {
+		backgroundColor: "#1A1A1A",
+		marginHorizontal: 20,
+		marginBottom: 12,
+		padding: 16,
+		borderRadius: 16,
+		gap: 12,
+	},
+	primaryButton: {
 		flexDirection: "row",
-		flexWrap: "wrap",
-		gap: 10,
-		marginTop: 24,
-		marginBottom: 16,
-	},
-	actionButton: {
-		flex: 1,
-		minWidth: 100,
-		backgroundColor: "#0066FF",
-		paddingVertical: 14,
-		paddingHorizontal: 16,
-		borderRadius: 12,
 		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "#007AFF",
+		paddingVertical: 14,
+		borderRadius: 12,
+		gap: 8,
 	},
-	actionButtonText: {
-		color: "#fff",
+	buttonIcon: {
+		fontSize: 18,
+	},
+	primaryButtonText: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#FFF",
+	},
+	secondaryButtons: {
+		flexDirection: "row",
+		gap: 12,
+	},
+	secondaryButton: {
+		flex: 1,
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "#2A2A2A",
+		paddingVertical: 12,
+		borderRadius: 12,
+		gap: 6,
+	},
+	secondaryButtonText: {
 		fontSize: 15,
 		fontWeight: "600",
+		color: "#FFF",
 	},
-	savedActionsContainer: {
+	saveActionsCard: {
+		backgroundColor: "#1A1A1A",
+		marginHorizontal: 20,
+		padding: 16,
+		borderRadius: 16,
 		flexDirection: "row",
 		justifyContent: "space-around",
-		paddingTop: 16,
-		borderTopWidth: 1,
-		borderTopColor: "#e0e0e0",
 		gap: 12,
 	},
 });
