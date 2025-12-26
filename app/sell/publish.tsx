@@ -1,45 +1,103 @@
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ResizeMode, Video } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
+	Image,
 	ScrollView,
 	StyleSheet,
 	Text,
+	TextInput,
 	TouchableOpacity,
 	View,
 } from "react-native";
 
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useAuth } from "@/contexts/AuthContext";
+import { garageSaleService } from "@/services/garageSaleService";
+import { rateLimitService } from "@/services/rateLimitService";
+
+// keep relative so it works even if @ alias breaks in app/
+import {
+	clearSellDraft,
+	loadSellDraft,
+	saveSellDraft,
+} from "../../lib/draftSale";
+
 function formatAddress(p: Location.LocationGeocodedAddress | undefined) {
 	if (!p) return "";
-	const parts = [p.streetNumber, p.street, p.city, p.region].filter(Boolean);
-	return parts.join(", ");
+	const parts = [
+		p.streetNumber,
+		p.street,
+		p.city,
+		p.region,
+		p.postalCode,
+	].filter(Boolean);
+	return parts.join(" ");
 }
 
-export default function ReviewPublish() {
-	const params = useLocalSearchParams<{ videoUri?: string; mode?: string }>();
-	const videoUri = params.videoUri || "";
+function formatDate(date: Date) {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, "0");
+	const day = String(date.getDate()).padStart(2, "0");
+	return `${year}-${month}-${day}`;
+}
 
-	const [addressLine, setAddressLine] = useState<string>(
-		"Fetching location..."
-	);
-	const [photos, setPhotos] = useState<string[]>([]);
+function formatTime(date: Date) {
+	const hours = String(date.getHours()).padStart(2, "0");
+	const minutes = String(date.getMinutes()).padStart(2, "0");
+	return `${hours}:${minutes}`;
+}
+
+export default function PublishScreen() {
+	const params = useLocalSearchParams<{ videoUri?: string }>();
+	const videoUri =
+		typeof params.videoUri === "string" ? params.videoUri : undefined;
+
+	const { user } = useAuth();
+
+	const [analyzing, setAnalyzing] = useState(false);
+	const [publishing, setPublishing] = useState(false);
+
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
-	const [categories, setCategories] = useState([
-		"Furniture",
-		"Electronics",
-		"Books",
-		"Clothing",
-	]);
-	const [analyzing, setAnalyzing] = useState(false);
+	const [categories, setCategories] = useState<string[]>([]);
+	const [photos, setPhotos] = useState<string[]>([]);
+
+	const [addressLine, setAddressLine] = useState("");
+	const [coords, setCoords] = useState<{
+		latitude: number;
+		longitude: number;
+	} | null>(null);
+
+	const maxPhotos = 8;
 
 	useEffect(() => {
 		(async () => {
+			// Load draft first (so if user comes back, they don’t lose work)
+			try {
+				const draft = await loadSellDraft();
+				if (draft) {
+					setTitle(draft.title || "");
+					setDescription(draft.description || "");
+					setCategories(
+						Array.isArray(draft.categories) ? draft.categories : []
+					);
+					setPhotos(Array.isArray(draft.photos) ? draft.photos : []);
+					setAddressLine(draft.addressLine || "");
+					if (draft.coords?.latitude && draft.coords?.longitude) {
+						setCoords({
+							latitude: draft.coords.latitude,
+							longitude: draft.coords.longitude,
+						});
+					}
+				}
+			} catch {}
+
+			// Fetch location best-effort
 			try {
 				const perm = await Location.requestForegroundPermissionsAsync();
 				if (perm.status !== "granted") return;
@@ -49,30 +107,59 @@ export default function ReviewPublish() {
 					latitude: pos.coords.latitude,
 					longitude: pos.coords.longitude,
 				};
-				const geos = await Location.reverseGeocodeAsync(loc);
-				setAddressLine(formatAddress(geos?.[0]) || "Your location");
-			} catch {
-				setAddressLine("Your location");
-			}
-		})();
+				setCoords(loc);
 
-		// If video is provided, simulate AI analysis
-		if (videoUri) {
-			analyzeVideo();
-		}
+				const geos = await Location.reverseGeocodeAsync(loc);
+				const addr = formatAddress(geos?.[0]) || "Your location";
+				setAddressLine((prev) => prev || addr);
+
+				await saveSellDraft({
+					videoUri,
+					title,
+					description,
+					photos,
+					addressLine: addr,
+					categories,
+					coords: loc,
+				});
+			} catch {}
+		})();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
+
+	// Auto-save draft on changes
+	useEffect(() => {
+		saveSellDraft({
+			videoUri,
+			title,
+			description,
+			photos,
+			addressLine,
+			categories,
+			coords,
+		}).catch(() => {});
+	}, [videoUri, title, description, photos, addressLine, categories, coords]);
 
 	const analyzeVideo = async () => {
 		setAnalyzing(true);
-		// Simulate AI analysis delay
-		await new Promise((resolve) => setTimeout(resolve, 2000));
+		await new Promise((resolve) => setTimeout(resolve, 1200));
 
-		// Mock AI results
-		setTitle("Multi-Family Garage Sale");
-		setDescription("Furniture, electronics, books, and household items");
-		setCategories(["Furniture", "Electronics", "Books", "Clothing"]);
+		// only fill if empty (don’t overwrite edits)
+		setTitle((t) => (t ? t : "Multi-Family Garage Sale"));
+		setDescription((d) =>
+			d ? d : "Furniture, electronics, books, and household items"
+		);
+		setCategories((c) =>
+			c?.length ? c : ["Furniture", "Electronics", "Books", "Clothing"]
+		);
+
 		setAnalyzing(false);
 	};
+
+	useEffect(() => {
+		if (videoUri) analyzeVideo();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [videoUri]);
 
 	const onUploadPhotos = async () => {
 		const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -84,37 +171,111 @@ export default function ReviewPublish() {
 			return;
 		}
 
+		const remaining = maxPhotos - photos.length;
+		if (remaining <= 0) {
+			Alert.alert("Limit reached", `You can upload up to ${maxPhotos} photos.`);
+			return;
+		}
+
 		const res = await ImagePicker.launchImageLibraryAsync({
 			allowsMultipleSelection: true,
+			selectionLimit: remaining,
 			mediaTypes: ImagePicker.MediaTypeOptions.Images,
 			quality: 0.9,
 		});
 
 		if (!res.canceled) {
 			const uris = res.assets.map((a) => a.uri);
-			setPhotos((prev) => [...prev, ...uris]);
+			setPhotos((prev) => [...prev, ...uris].slice(0, maxPhotos));
 		}
 	};
 
-	const onPublish = () => {
-		Alert.alert(
-			"Publish Sale",
-			"Ready to publish! This will create your garage sale listing.",
-			[{ text: "OK", onPress: () => router.back() }]
-		);
+	const removePhoto = (uri: string) => {
+		setPhotos((prev) => prev.filter((p) => p !== uri));
+	};
+
+	const canPublish = useMemo(() => {
+		return title.trim().length > 0 && description.trim().length > 0 && !!coords;
+	}, [title, description, coords]);
+
+	const onPublish = async () => {
+		if (publishing) return;
+
+		if (!canPublish) {
+			Alert.alert(
+				"Missing info",
+				!coords
+					? "We need your location to pin the sale on the map. Please enable location permission."
+					: "Please add at least a title and description before publishing."
+			);
+			return;
+		}
+
+		setPublishing(true);
+		try {
+			const deviceId = await rateLimitService.getDeviceId();
+
+			// For now: publish as a simple single-day sale, 9am-5pm default.
+			// You can wire real date/time pickers later.
+			const start = new Date();
+			const end = new Date();
+			end.setHours(Math.min(23, start.getHours() + 6));
+
+			await garageSaleService.addGarageSale(
+				{
+					title: title.trim(),
+					description: description.trim(),
+					location: {
+						latitude: coords!.latitude,
+						longitude: coords!.longitude,
+						address: addressLine || "Your location",
+					},
+					date: formatDate(start),
+					startDate: formatDate(start),
+					endDate: formatDate(start),
+					startTime: formatTime(start),
+					endTime: formatTime(end),
+					categories,
+					contactName: user?.email || "Seller",
+					contactPhone: undefined,
+					contactEmail: user?.email || undefined,
+					videoUrl: videoUri || undefined,
+					images: photos.length ? photos : undefined,
+					isActive: true,
+				},
+				deviceId,
+				user?.id
+			);
+
+			await clearSellDraft();
+
+			Alert.alert("Success", "Your garage sale is live!", [
+				{
+					text: "OK",
+					onPress: () => {
+						// Go back to Discover. Discover auto-refreshes via useFocusEffect.
+						router.replace("/(tabs)");
+					},
+				},
+			]);
+		} catch (e: any) {
+			console.error("Publish error:", e);
+			Alert.alert(
+				"Error",
+				e?.message || "Failed to publish. Please try again."
+			);
+		} finally {
+			setPublishing(false);
+		}
 	};
 
 	const goBack = () => {
-		if (router.canGoBack()) {
-			router.back();
-		} else {
-			router.replace("/(tabs)");
-		}
+		if (router.canGoBack()) router.back();
+		else router.replace("/(tabs)");
 	};
 
 	return (
 		<View style={styles.safe}>
-			{/* Header */}
 			<View style={styles.header}>
 				<TouchableOpacity onPress={goBack} style={styles.backBtn}>
 					<IconSymbol size={24} name="chevron.left" color="#1F1F1F" />
@@ -127,7 +288,6 @@ export default function ReviewPublish() {
 				contentContainerStyle={styles.content}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Video Preview */}
 				{videoUri ? (
 					<View style={styles.videoBox}>
 						<Video
@@ -145,7 +305,6 @@ export default function ReviewPublish() {
 					</View>
 				)}
 
-				{/* AI Analysis Loading */}
 				{analyzing && (
 					<View style={styles.analyzingCard}>
 						<ActivityIndicator size="small" color="#D97B3F" />
@@ -155,48 +314,60 @@ export default function ReviewPublish() {
 					</View>
 				)}
 
-				{/* AI Detected Items */}
-				{!analyzing && (
-					<View style={styles.card}>
-						<View style={styles.cardHeader}>
-							<IconSymbol size={20} name="tag" color="#D97B3F" />
-							<Text style={styles.cardTitle}>AI Detected Items</Text>
-						</View>
-
-						<View style={styles.chipRow}>
-							{categories.map((cat) => (
-								<View key={cat} style={styles.chip}>
-									<Text style={styles.chipText}>{cat}</Text>
-								</View>
-							))}
-						</View>
-
-						{title && (
-							<View style={styles.aiDetail}>
-								<Text style={styles.aiDetailLabel}>Suggested Title:</Text>
-								<Text style={styles.aiDetailValue}>{title}</Text>
-							</View>
-						)}
-
-						{description && (
-							<View style={styles.aiDetail}>
-								<Text style={styles.aiDetailLabel}>Description:</Text>
-								<Text style={styles.aiDetailValue}>{description}</Text>
-							</View>
-						)}
+				<View style={styles.card}>
+					<View style={styles.cardHeader}>
+						<IconSymbol size={20} name="tag" color="#D97B3F" />
+						<Text style={styles.cardTitle}>Details</Text>
 					</View>
-				)}
 
-				{/* Location */}
+					<Text style={styles.label}>Title</Text>
+					<TextInput
+						value={title}
+						onChangeText={setTitle}
+						placeholder="e.g. Garage Sale"
+						style={styles.input}
+					/>
+
+					<Text style={styles.label}>Description</Text>
+					<TextInput
+						value={description}
+						onChangeText={setDescription}
+						placeholder="What are you selling?"
+						style={[styles.input, styles.textarea]}
+						multiline
+					/>
+
+					<Text style={styles.label}>Categories (comma separated)</Text>
+					<TextInput
+						value={categories.join(", ")}
+						onChangeText={(t) =>
+							setCategories(
+								t
+									.split(",")
+									.map((s) => s.trim())
+									.filter(Boolean)
+							)
+						}
+						placeholder="Furniture, Electronics, Toys"
+						style={styles.input}
+					/>
+				</View>
+
 				<View style={styles.card}>
 					<View style={styles.cardHeader}>
 						<IconSymbol size={20} name="location.fill" color="#D97B3F" />
 						<Text style={styles.cardTitle}>Location</Text>
 					</View>
-					<Text style={styles.locationText}>{addressLine}</Text>
+					<Text style={styles.locationText}>
+						{addressLine || "Fetching your location..."}
+					</Text>
+					{!coords && (
+						<Text style={styles.locationHint}>
+							Enable location permission so your sale can appear on the map.
+						</Text>
+					)}
 				</View>
 
-				{/* Upload Photos */}
 				<TouchableOpacity
 					style={styles.dashedUpload}
 					onPress={onUploadPhotos}
@@ -208,13 +379,34 @@ export default function ReviewPublish() {
 					</Text>
 				</TouchableOpacity>
 
-				{/* Publish Button */}
+				{photos.length > 0 && (
+					<View style={styles.photoGrid}>
+						{photos.map((uri) => (
+							<View key={uri} style={styles.photoItem}>
+								<Image source={{ uri }} style={styles.photo} />
+								<TouchableOpacity
+									style={styles.removePhoto}
+									onPress={() => removePhoto(uri)}
+								>
+									<Text style={styles.removePhotoText}>×</Text>
+								</TouchableOpacity>
+							</View>
+						))}
+					</View>
+				)}
+
 				<TouchableOpacity
-					style={styles.publishBtn}
+					style={[
+						styles.publishBtn,
+						(!canPublish || publishing) && { opacity: 0.6 },
+					]}
 					onPress={onPublish}
 					activeOpacity={0.92}
+					disabled={!canPublish || publishing}
 				>
-					<Text style={styles.publishText}>Publish Sale</Text>
+					<Text style={styles.publishText}>
+						{publishing ? "Publishing..." : "Publish Sale"}
+					</Text>
 				</TouchableOpacity>
 
 				<View style={{ height: 120 }} />
@@ -255,10 +447,7 @@ const styles = StyleSheet.create({
 		overflow: "hidden",
 		marginBottom: 12,
 	},
-	video: {
-		width: "100%",
-		height: "100%",
-	},
+	video: { width: "100%", height: "100%" },
 	noVideoBox: {
 		height: 200,
 		borderRadius: 18,
@@ -287,11 +476,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		gap: 12,
 	},
-	analyzingText: {
-		fontSize: 15,
-		fontWeight: "600",
-		color: "#6F6A64",
-	},
+	analyzingText: { fontSize: 15, fontWeight: "600", color: "#6F6A64" },
 
 	card: {
 		backgroundColor: "#FFF",
@@ -305,70 +490,84 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		alignItems: "center",
 		gap: 10,
-		marginBottom: 14,
+		marginBottom: 12,
 	},
-	cardTitle: { fontSize: 18, fontWeight: "700", color: "#1F1F1F" },
+	cardTitle: { fontSize: 16, fontWeight: "800", color: "#1F1F1F" },
 
-	chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-	chip: {
-		paddingVertical: 10,
-		paddingHorizontal: 16,
-		borderRadius: 20,
-		backgroundColor: "#F1EDE6",
-		borderWidth: 1,
-		borderColor: "#E6E1DA",
-	},
-	chipText: { fontSize: 15, fontWeight: "600", color: "#1F1F1F" },
-
-	aiDetail: {
-		marginTop: 14,
-		paddingTop: 14,
-		borderTopWidth: 1,
-		borderTopColor: "#E6E1DA",
-	},
-	aiDetailLabel: {
+	label: {
 		fontSize: 13,
 		fontWeight: "700",
 		color: "#6F6A64",
+		marginTop: 10,
 		marginBottom: 6,
 	},
-	aiDetailValue: {
+	input: {
+		borderWidth: 1,
+		borderColor: "#E6E1DA",
+		borderRadius: 12,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		backgroundColor: "#FAF7F2",
 		fontSize: 15,
-		fontWeight: "500",
 		color: "#1F1F1F",
-		lineHeight: 22,
 	},
+	textarea: { minHeight: 90, textAlignVertical: "top" },
 
-	locationText: {
-		fontSize: 15,
-		fontWeight: "500",
-		color: "#6F6A64",
-		lineHeight: 22,
-	},
+	locationText: { fontSize: 15, fontWeight: "700", color: "#1F1F1F" },
+	locationHint: { marginTop: 8, fontSize: 13, color: "#6F6A64" },
 
 	dashedUpload: {
-		height: 60,
-		borderRadius: 18,
-		borderWidth: 2,
-		borderStyle: "dashed",
+		borderWidth: 1,
 		borderColor: "#D97B3F",
+		borderStyle: "dashed",
+		borderRadius: 18,
+		padding: 16,
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 10,
 		backgroundColor: "#FFF",
+		marginBottom: 12,
+	},
+	dashedText: { fontSize: 15, fontWeight: "700", color: "#D97B3F" },
+
+	photoGrid: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 10,
+		marginBottom: 14,
+	},
+	photoItem: {
+		width: 90,
+		height: 90,
+		borderRadius: 14,
+		overflow: "hidden",
+		position: "relative",
+	},
+	photo: { width: "100%", height: "100%" },
+	removePhoto: {
+		position: "absolute",
+		top: 6,
+		right: 6,
+		width: 22,
+		height: 22,
+		borderRadius: 11,
+		backgroundColor: "rgba(0,0,0,0.65)",
 		alignItems: "center",
 		justifyContent: "center",
-		flexDirection: "row",
-		gap: 10,
-		marginTop: 10,
-		marginBottom: 20,
 	},
-	dashedText: { fontSize: 16, fontWeight: "700", color: "#D97B3F" },
+	removePhotoText: {
+		color: "#fff",
+		fontSize: 18,
+		lineHeight: 18,
+		fontWeight: "800",
+	},
 
 	publishBtn: {
-		height: 56,
-		borderRadius: 28,
 		backgroundColor: "#D97B3F",
+		borderRadius: 18,
+		paddingVertical: 16,
 		alignItems: "center",
-		justifyContent: "center",
-		marginTop: 10,
+		marginTop: 6,
 	},
-	publishText: { color: "#FFF", fontSize: 18, fontWeight: "700" },
+	publishText: { fontSize: 16, fontWeight: "800", color: "#fff" },
 });

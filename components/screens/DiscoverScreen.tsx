@@ -1,16 +1,18 @@
+import { useFocusEffect } from "@react-navigation/native";
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
 	ActivityIndicator,
 	FlatList,
+	RefreshControl,
 	SafeAreaView,
 	StyleSheet,
 	Text,
 	TouchableOpacity,
 	View,
 } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import MapView, { Marker, PROVIDER_DEFAULT, Region } from "react-native-maps";
 
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -62,70 +64,74 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 
 	const [mode, setMode] = useState<Mode>(initialMode);
 	const [loading, setLoading] = useState(true);
+	const [refreshing, setRefreshing] = useState(false);
 
 	const [userLoc, setUserLoc] = useState<{
 		latitude: number;
 		longitude: number;
 	} | null>(null);
-
 	const [addressLine, setAddressLine] = useState("");
 	const [sales, setSales] = useState<GarageSale[]>([]);
 
-	useEffect(() => {
-		setMode(initialMode);
-	}, [initialMode]);
+	const loadSales = useCallback(async () => {
+		try {
+			setLoading(true);
 
-	useEffect(() => {
-		(async () => {
-			try {
-				setLoading(true);
-
-				const perm = await Location.requestForegroundPermissionsAsync();
-				if (perm.status !== "granted") {
-					const list = await garageSaleService.getAllGarageSales();
-					setSales(list);
-					setAddressLine("Enable location for better results");
-					setLoading(false);
-					return;
-				}
-
-				const pos = await Location.getCurrentPositionAsync({});
-
-				const loc = {
-					latitude: pos.coords.latitude,
-					longitude: pos.coords.longitude,
-				};
-
-				setUserLoc(loc);
-
-				const geos = await Location.reverseGeocodeAsync(loc);
-				setAddressLine(formatAddress(geos?.[0]));
-
-				const list = await garageSaleService.getGarageSalesNearby(
-					loc.latitude,
-					loc.longitude
-				);
-
+			const perm = await Location.requestForegroundPermissionsAsync();
+			if (perm.status !== "granted") {
+				const list = await garageSaleService.getAllGarageSales();
 				setSales(list);
-			} catch (e: any) {
-				console.error(e);
-				setAddressLine("Location unavailable");
-				try {
-					const list = await garageSaleService.getAllGarageSales();
-					setSales(list);
-				} catch (err) {
-					console.error("Failed to load sales:", err);
-				}
-			} finally {
-				setLoading(false);
+				setAddressLine("Enable location for better results");
+				return;
 			}
-		})();
+
+			const pos = await Location.getCurrentPositionAsync({});
+			const loc = {
+				latitude: pos.coords.latitude,
+				longitude: pos.coords.longitude,
+			};
+			setUserLoc(loc);
+
+			const geos = await Location.reverseGeocodeAsync(loc);
+			setAddressLine(formatAddress(geos?.[0]) || "Your location");
+
+			const list = await garageSaleService.getGarageSalesNearby(
+				loc.latitude,
+				loc.longitude
+			);
+			setSales(list);
+		} catch (e) {
+			console.error("Discover loadSales error:", e);
+			setAddressLine((prev) => prev || "Location unavailable");
+			try {
+				const list = await garageSaleService.getAllGarageSales();
+				setSales(list);
+			} catch (err) {
+				console.error("Failed to load sales fallback:", err);
+			}
+		} finally {
+			setLoading(false);
+		}
 	}, []);
 
-	const salesWithDistance: SaleWithDistance[] = useMemo(() => {
-		if (!userLoc) {
-			return sales.map((s) => ({ ...s, _distanceText: "" }));
+	// Key fix: refresh whenever user comes back to this screen
+	useFocusEffect(
+		useCallback(() => {
+			loadSales();
+		}, [loadSales])
+	);
+
+	const onRefresh = useCallback(async () => {
+		setRefreshing(true);
+		try {
+			await loadSales();
+		} finally {
+			setRefreshing(false);
 		}
+	}, [loadSales]);
+
+	const salesWithDistance: SaleWithDistance[] = useMemo(() => {
+		if (!userLoc) return sales.map((s) => ({ ...s, _distanceText: "" }));
 
 		return sales.map((s) => {
 			const km = haversineKm(userLoc, s.location);
@@ -134,10 +140,19 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 				feet >= 5280
 					? `${Math.round(feet / 5280)} mi`
 					: `${Math.round(feet)} ft`;
-
 			return { ...s, _distanceText: distanceText };
 		});
 	}, [sales, userLoc]);
+
+	const initialRegion: Region = useMemo(
+		() => ({
+			latitude: userLoc?.latitude ?? 43.4516,
+			longitude: userLoc?.longitude ?? -80.4925,
+			latitudeDelta: 0.06,
+			longitudeDelta: 0.06,
+		}),
+		[userLoc]
+	);
 
 	return (
 		<SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
@@ -184,18 +199,16 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 							<SaleCard sale={item} distanceText={item._distanceText} />
 						)}
 						showsVerticalScrollIndicator={false}
+						refreshControl={
+							<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+						}
 					/>
 				) : (
 					<View style={styles.mapWrap}>
 						<MapView
 							provider={PROVIDER_DEFAULT}
 							style={StyleSheet.absoluteFill}
-							initialRegion={{
-								latitude: userLoc?.latitude ?? 43.4516,
-								longitude: userLoc?.longitude ?? -80.4925,
-								latitudeDelta: 0.06,
-								longitudeDelta: 0.06,
-							}}
+							initialRegion={initialRegion}
 						>
 							{salesWithDistance.map((s) => (
 								<Marker
@@ -236,16 +249,8 @@ const styles = StyleSheet.create({
 		marginTop: 4,
 		marginBottom: 8,
 	},
-	addressIcon: {
-		fontSize: 14,
-		fontWeight: "700",
-		opacity: 0.9,
-	},
-	addressText: {
-		flex: 1,
-		fontSize: 14,
-		fontWeight: "600",
-	},
+	addressIcon: { fontSize: 14, fontWeight: "700", opacity: 0.9 },
+	addressText: { flex: 1, fontSize: 14, fontWeight: "600" },
 
 	title: {
 		fontSize: 34,
@@ -272,7 +277,6 @@ const styles = StyleSheet.create({
 		borderColor: "#E6E1DA",
 	},
 
-	// Floating Action Button
 	fab: {
 		position: "absolute",
 		right: 20,

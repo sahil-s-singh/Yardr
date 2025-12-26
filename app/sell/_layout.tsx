@@ -12,6 +12,7 @@ export default function SellLayout() {
 			<Stack.Screen name="index" />
 			<Stack.Screen name="video" />
 			<Stack.Screen name="publish" />
+			<Stack.Screen name="success" />
 		</Stack>
 	);
 }

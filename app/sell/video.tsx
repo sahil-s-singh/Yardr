@@ -1,7 +1,16 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+	Alert,
+	AppState,
+	AppStateStatus,
+	Linking,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
+} from "react-native";
 
 export default function SellVideoScreen() {
 	const cameraRef = useRef<CameraView>(null);
@@ -11,7 +20,8 @@ export default function SellVideoScreen() {
 	const [isRecording, setIsRecording] = useState(false);
 	const [showModal, setShowModal] = useState(true);
 	const [recordingTime, setRecordingTime] = useState(0);
-	const timerRef = useRef<number | null>(null);
+	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
 	useEffect(() => {
 		(async () => {
@@ -28,14 +38,45 @@ export default function SellVideoScreen() {
 		})();
 	}, [permission, requestPermission]);
 
+	// Stop recording if app goes background (real-world edge case)
+	useEffect(() => {
+		const sub = AppState.addEventListener("change", async (nextState) => {
+			const prev = appStateRef.current;
+			appStateRef.current = nextState;
+
+			const goingInactive =
+				(prev === "active" && nextState !== "active") ||
+				nextState === "background";
+
+			if (goingInactive && isRecording) {
+				try {
+					await cameraRef.current?.stopRecording();
+				} catch {
+					// ignore
+				}
+				safeStopTimer();
+				setIsRecording(false);
+				setShowModal(true);
+				Alert.alert("Recording stopped", "The app was interrupted.");
+			}
+		});
+
+		return () => sub.remove();
+	}, [isRecording]);
+
 	// Cleanup timer on unmount
 	useEffect(() => {
 		return () => {
-			if (timerRef.current) {
-				clearInterval(timerRef.current);
-			}
+			safeStopTimer();
 		};
 	}, []);
+
+	const safeStopTimer = () => {
+		if (timerRef.current) {
+			clearInterval(timerRef.current);
+			timerRef.current = null;
+		}
+	};
 
 	const safeBack = () => {
 		if (router.canGoBack()) router.back();
@@ -53,27 +94,19 @@ export default function SellVideoScreen() {
 		if (isRecording) return;
 
 		try {
-			// Hide the modal and reset timer
 			setShowModal(false);
 			setIsRecording(true);
 			setRecordingTime(0);
 
-			// Start timer countdown
 			timerRef.current = setInterval(() => {
 				setRecordingTime((prev) => prev + 1);
 			}, 1000);
 
-			// Start recording
 			const video = await cameraRef.current?.recordAsync({
 				maxDuration: 5,
 			});
 
-			// Stop timer
-			if (timerRef.current) {
-				clearInterval(timerRef.current);
-				timerRef.current = null;
-			}
-
+			safeStopTimer();
 			setIsRecording(false);
 
 			if (!video?.uri) {
@@ -82,18 +115,12 @@ export default function SellVideoScreen() {
 				return;
 			}
 
-			// Pass the video uri to publish/review screen
 			router.push({
 				pathname: "/sell/publish",
 				params: { videoUri: video.uri },
 			});
 		} catch (e: any) {
-			// Stop timer
-			if (timerRef.current) {
-				clearInterval(timerRef.current);
-				timerRef.current = null;
-			}
-
+			safeStopTimer();
 			setIsRecording(false);
 			setShowModal(true);
 			Alert.alert("Recording error", e?.message ?? "Failed to record video.");
@@ -104,7 +131,7 @@ export default function SellVideoScreen() {
 	const onStopRecording = async () => {
 		try {
 			await cameraRef.current?.stopRecording();
-		} catch (e) {
+		} catch {
 			// ignore
 		}
 	};
@@ -113,10 +140,35 @@ export default function SellVideoScreen() {
 		router.push("/sell/publish");
 	};
 
-	if (!permission?.granted) {
+	// Permission loading state
+	if (!permission) {
 		return (
 			<View style={styles.center}>
-				<Text style={styles.text}>Requesting camera permission…</Text>
+				<Text style={styles.permissionText}>Checking camera permission…</Text>
+			</View>
+		);
+	}
+
+	// Permission denied state with recovery
+	if (!permission.granted) {
+		return (
+			<View style={styles.center}>
+				<Text style={styles.permissionTitle}>Camera access needed</Text>
+				<Text style={styles.permissionText}>
+					To record a listing video, please enable camera permission in
+					Settings.
+				</Text>
+
+				<TouchableOpacity
+					style={styles.primaryBtn}
+					onPress={() => Linking.openSettings()}
+				>
+					<Text style={styles.primaryBtnText}>Open Settings</Text>
+				</TouchableOpacity>
+
+				<TouchableOpacity style={styles.skipBtn} onPress={onSkip}>
+					<Text style={styles.skipText}>Skip Video (Fill Manually)</Text>
+				</TouchableOpacity>
 			</View>
 		);
 	}
@@ -131,12 +183,10 @@ export default function SellVideoScreen() {
 				onCameraReady={() => setCameraReady(true)}
 			/>
 
-			{/* Top right close button */}
 			<TouchableOpacity onPress={safeBack} style={styles.closeBtn}>
 				<Text style={styles.closeText}>✕</Text>
 			</TouchableOpacity>
 
-			{/* Recording timer when recording */}
 			{isRecording && (
 				<View style={styles.recordingIndicator}>
 					<View style={styles.recordingDot} />
@@ -144,7 +194,6 @@ export default function SellVideoScreen() {
 				</View>
 			)}
 
-			{/* Center modal UI - shows only when not recording */}
 			{showModal && !isRecording && (
 				<View style={styles.modalCard}>
 					<View style={styles.iconCircle}>
@@ -153,8 +202,8 @@ export default function SellVideoScreen() {
 
 					<Text style={styles.title}>Record a 5-second video</Text>
 					<Text style={styles.subtitle}>
-						Show your items in a quick video. Our AI will automatically detect
-						and tag items for your listing.
+						Show your items in a quick video. You can skip this and fill details
+						manually.
 					</Text>
 
 					<TouchableOpacity
@@ -173,7 +222,6 @@ export default function SellVideoScreen() {
 				</View>
 			)}
 
-			{/* Record button at bottom - only show when not recording and modal is hidden */}
 			{!showModal && !isRecording && (
 				<View style={styles.recordWrap}>
 					<TouchableOpacity
@@ -186,7 +234,6 @@ export default function SellVideoScreen() {
 				</View>
 			)}
 
-			{/* Stop button when recording */}
 			{isRecording && (
 				<View style={styles.recordWrap}>
 					<TouchableOpacity
@@ -203,8 +250,21 @@ export default function SellVideoScreen() {
 
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: "#000" },
-	center: { flex: 1, alignItems: "center", justifyContent: "center" },
-	text: { color: "#111", fontSize: 16 },
+	center: {
+		flex: 1,
+		alignItems: "center",
+		justifyContent: "center",
+		paddingHorizontal: 20,
+		backgroundColor: "#FAF7F2",
+	},
+	permissionTitle: { fontSize: 22, fontWeight: "800", color: "#1F1F1F" },
+	permissionText: {
+		marginTop: 10,
+		fontSize: 15,
+		lineHeight: 20,
+		color: "#6B625A",
+		textAlign: "center",
+	},
 
 	closeBtn: {
 		position: "absolute",
@@ -239,11 +299,7 @@ const styles = StyleSheet.create({
 		backgroundColor: "#fff",
 		marginRight: 8,
 	},
-	recordingText: {
-		color: "#fff",
-		fontSize: 16,
-		fontWeight: "700",
-	},
+	recordingText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 
 	modalCard: {
 		position: "absolute",
