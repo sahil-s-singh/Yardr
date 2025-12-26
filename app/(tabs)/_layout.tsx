@@ -1,4 +1,4 @@
-import { Tabs } from "expo-router";
+import { Tabs, router } from "expo-router";
 import React from "react";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -49,6 +49,7 @@ export default function TabLayout() {
 				}}
 			/>
 
+			{/* Dummy screen for Sell tab - intercepts and redirects */}
 			<Tabs.Screen
 				name="sell"
 				options={{
@@ -56,6 +57,14 @@ export default function TabLayout() {
 					tabBarIcon: ({ color }) => (
 						<IconSymbol size={32} name="plus.circle.fill" color={color} />
 					),
+				}}
+				listeners={{
+					tabPress: (e) => {
+						// Prevent default navigation
+						e.preventDefault();
+						// Navigate to the modal sell flow
+						router.push("/add-sale");
+					},
 				}}
 			/>
 

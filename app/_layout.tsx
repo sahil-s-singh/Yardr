@@ -1,146 +1,74 @@
-// app/_layout.tsx
-import {
-	DarkTheme,
-	DefaultTheme,
-	ThemeProvider,
-} from "@react-navigation/native";
-import { Stack } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
-import "react-native-reanimated";
+import { Tabs } from "expo-router";
+import React from "react";
 
-import { AuthProvider } from "@/contexts/AuthContext";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { initializeNotifications } from "@/lib/notifications";
 
-export const unstable_settings = {
-	anchor: "(tabs)",
-};
-
-export default function RootLayout() {
+export default function TabLayout() {
 	const colorScheme = useColorScheme();
-
-	useEffect(() => {
-		initializeNotifications();
-	}, []);
+	const theme = Colors[colorScheme ?? "light"];
 
 	return (
-		<AuthProvider>
-			<ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-				<Stack>
-					<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+		<Tabs
+			screenOptions={{
+				headerShown: false,
+				tabBarActiveTintColor: theme.tabIconSelected,
+				tabBarInactiveTintColor: theme.tabIconDefault,
+				tabBarStyle: {
+					backgroundColor: theme.card,
+					borderTopColor: theme.border,
+					borderTopWidth: 1,
+					height: 88,
+					paddingTop: 8,
+					paddingBottom: 20,
+				},
+				tabBarLabelStyle: {
+					fontSize: 12,
+					fontWeight: "600",
+				},
+			}}
+		>
+			<Tabs.Screen
+				name="index"
+				options={{
+					title: "Discover",
+					tabBarIcon: ({ color }) => (
+						<IconSymbol size={28} name="house.fill" color={color} />
+					),
+				}}
+			/>
 
-					{/* Sale Detail - New Screen */}
-					<Stack.Screen
-						name="sale-detail/[id]"
-						options={{
-							headerShown: true,
-							title: "Sale Details",
-							presentation: "card",
-							headerStyle: {
-								backgroundColor: "#0A0A0A",
-							},
-							headerTintColor: "#FFF",
-						}}
-					/>
+			<Tabs.Screen
+				name="map"
+				options={{
+					title: "Map",
+					tabBarIcon: ({ color }) => (
+						<IconSymbol size={28} name="map.fill" color={color} />
+					),
+				}}
+			/>
 
-					{/* Add Sale - Streamlined */}
-					<Stack.Screen
-						name="add-sale"
-						options={{
-							headerShown: false,
-							presentation: "fullScreenModal",
-						}}
-					/>
+			{/* REAL Sell tab backed by app/(tabs)/sell */}
+			<Tabs.Screen
+				name="sell"
+				options={{
+					title: "Sell",
+					tabBarIcon: ({ color }) => (
+						<IconSymbol size={34} name="plus.circle.fill" color={color} />
+					),
+				}}
+			/>
 
-					{/* Auth Screens */}
-					<Stack.Screen
-						name="auth/sign-in"
-						options={{
-							headerShown: true,
-							title: "Sign In",
-							headerStyle: {
-								backgroundColor: "#0A0A0A",
-							},
-							headerTintColor: "#FFF",
-						}}
-					/>
-					<Stack.Screen
-						name="auth/sign-up"
-						options={{
-							headerShown: true,
-							title: "Sign Up",
-							headerStyle: {
-								backgroundColor: "#0A0A0A",
-							},
-							headerTintColor: "#FFF",
-						}}
-					/>
-
-					{/* User Features - These files should exist in your app/ folder */}
-					<Stack.Screen
-						name="my-sales"
-						options={{
-							headerShown: true,
-							title: "My Garage Sales",
-							headerStyle: {
-								backgroundColor: "#0A0A0A",
-							},
-							headerTintColor: "#FFF",
-						}}
-					/>
-
-					{/* Edit Features */}
-					<Stack.Screen
-						name="edit-sale/[id]"
-						options={{
-							headerShown: true,
-							title: "Edit Sale",
-							headerStyle: {
-								backgroundColor: "#0A0A0A",
-							},
-							headerTintColor: "#FFF",
-						}}
-					/>
-					<Stack.Screen
-						name="add-video/[id]"
-						options={{
-							headerShown: true,
-							title: "Add Video",
-							headerStyle: {
-								backgroundColor: "#0A0A0A",
-							},
-							headerTintColor: "#FFF",
-						}}
-					/>
-
-					{/* Keep old routes for backward compatibility */}
-					<Stack.Screen
-						name="add-garage-sale"
-						options={{
-							headerShown: false,
-							headerStyle: {
-								backgroundColor: "#0A0A0A",
-							},
-							headerTintColor: "#FFF",
-						}}
-					/>
-
-					{/* Modal and other screens */}
-					<Stack.Screen
-						name="modal"
-						options={{
-							presentation: "modal",
-							title: "Modal",
-							headerStyle: {
-								backgroundColor: "#0A0A0A",
-							},
-							headerTintColor: "#FFF",
-						}}
-					/>
-				</Stack>
-				<StatusBar style="light" />
-			</ThemeProvider>
-		</AuthProvider>
+			<Tabs.Screen
+				name="profile"
+				options={{
+					title: "Profile",
+					tabBarIcon: ({ color }) => (
+						<IconSymbol size={28} name="person.fill" color={color} />
+					),
+				}}
+			/>
+		</Tabs>
 	);
 }

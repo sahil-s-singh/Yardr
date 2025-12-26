@@ -1,6 +1,7 @@
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
 	Alert,
@@ -11,20 +12,13 @@ import {
 	View,
 } from "react-native";
 
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-
 function formatAddress(p: Location.LocationGeocodedAddress | undefined) {
 	if (!p) return "";
 	const parts = [p.streetNumber, p.street, p.city, p.region].filter(Boolean);
-	return parts.join(" ");
+	return parts.join(", ");
 }
 
 export default function ReviewPublish() {
-	const colorScheme = useColorScheme();
-	const theme = Colors[colorScheme ?? "light"];
-
 	const params = useLocalSearchParams<{ videoUri?: string; mode?: string }>();
 	const videoUri = params.videoUri || "";
 
@@ -32,6 +26,14 @@ export default function ReviewPublish() {
 		"Fetching location..."
 	);
 	const [photos, setPhotos] = useState<string[]>([]);
+	const [title, setTitle] = useState("");
+	const [description, setDescription] = useState("");
+	const [categories, setCategories] = useState([
+		"Furniture",
+		"Electronics",
+		"Books",
+		"Clothing",
+	]);
 
 	useEffect(() => {
 		(async () => {
@@ -39,9 +41,7 @@ export default function ReviewPublish() {
 				const perm = await Location.requestForegroundPermissionsAsync();
 				if (perm.status !== "granted") return;
 
-				const pos = await Location.getCurrentPositionAsync({
-					accuracy: Location.Accuracy.High,
-				});
+				const pos = await Location.getCurrentPositionAsync({});
 				const loc = {
 					latitude: pos.coords.latitude,
 					longitude: pos.coords.longitude,
@@ -79,94 +79,70 @@ export default function ReviewPublish() {
 	const onPublish = () => {
 		Alert.alert(
 			"Publish Sale",
-			"UI is now matching the target screenshot. Next step is wiring this button to your existing publish logic."
+			"Ready to publish! Next step is wiring this to your backend.",
+			[{ text: "OK", onPress: () => router.back() }]
 		);
 	};
 
 	return (
-		<View style={[styles.safe, { backgroundColor: theme.background }]}>
+		<View style={styles.safe}>
+			{/* Header */}
 			<View style={styles.header}>
-				<Text style={[styles.headerTitle, { color: theme.text }]}>
-					Review & Publish
-				</Text>
+				<TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+					<IconSymbol size={24} name="chevron.left" color="#1F1F1F" />
+				</TouchableOpacity>
+				<Text style={styles.headerTitle}>Review & Publish</Text>
+				<View style={styles.placeholder} />
 			</View>
 
 			<ScrollView
 				contentContainerStyle={styles.content}
 				showsVerticalScrollIndicator={false}
 			>
-				<View
-					style={[
-						styles.videoBox,
-						{ backgroundColor: theme.muted, borderColor: theme.border },
-					]}
-				>
-					<IconSymbol size={34} name="video" color={theme.secondaryText} />
+				{/* Video Preview */}
+				<View style={styles.videoBox}>
+					<IconSymbol size={48} name="video" color="#9A928A" />
+					<Text style={styles.videoCaption}>Video preview</Text>
 				</View>
-				<Text style={[styles.caption, { color: theme.secondaryText }]}>
-					Video preview
-				</Text>
 
-				<View
-					style={[
-						styles.card,
-						{ backgroundColor: theme.card, borderColor: theme.border },
-					]}
-				>
-					<View style={styles.cardTitleRow}>
-						<IconSymbol size={20} name="tag" color={theme.tint} />
-						<Text style={[styles.cardTitle, { color: theme.text }]}>
-							AI Detected Items
-						</Text>
+				{/* AI Detected Items */}
+				<View style={styles.card}>
+					<View style={styles.cardHeader}>
+						<IconSymbol size={20} name="tag" color="#D97B3F" />
+						<Text style={styles.cardTitle}>AI Detected Items</Text>
 					</View>
 
 					<View style={styles.chipRow}>
-						{["Furniture", "Electronics", "Books", "Clothing"].map((x) => (
-							<View
-								key={x}
-								style={[
-									styles.chip,
-									{ backgroundColor: theme.muted, borderColor: theme.border },
-								]}
-							>
-								<Text style={[styles.chipText, { color: theme.text }]}>
-									{x}
-								</Text>
+						{categories.map((cat) => (
+							<View key={cat} style={styles.chip}>
+								<Text style={styles.chipText}>{cat}</Text>
 							</View>
 						))}
 					</View>
 				</View>
 
-				<View
-					style={[
-						styles.card,
-						{ backgroundColor: theme.card, borderColor: theme.border },
-					]}
-				>
-					<View style={styles.cardTitleRow}>
-						<IconSymbol size={20} name="location.fill" color={theme.tint} />
-						<Text style={[styles.cardTitle, { color: theme.text }]}>
-							Location
-						</Text>
+				{/* Location */}
+				<View style={styles.card}>
+					<View style={styles.cardHeader}>
+						<IconSymbol size={20} name="location.fill" color="#D97B3F" />
+						<Text style={styles.cardTitle}>Location</Text>
 					</View>
-					<Text style={[styles.locationText, { color: theme.secondaryText }]}>
-						{addressLine}
-					</Text>
+					<Text style={styles.locationText}>{addressLine}</Text>
 				</View>
 
+				{/* Upload Photos */}
 				<TouchableOpacity
-					style={[styles.dashedUpload, { borderColor: theme.tint }]}
+					style={styles.dashedUpload}
 					onPress={onUploadPhotos}
-					activeOpacity={0.9}
+					activeOpacity={0.8}
 				>
-					<IconSymbol size={22} name="square.and.arrow.up" color={theme.tint} />
-					<Text style={[styles.dashedText, { color: theme.tint }]}>
-						Upload Additional Photos
-					</Text>
+					<IconSymbol size={24} name="square.and.arrow.up" color="#D97B3F" />
+					<Text style={styles.dashedText}>Upload Additional Photos</Text>
 				</TouchableOpacity>
 
+				{/* Publish Button */}
 				<TouchableOpacity
-					style={[styles.publishBtn, { backgroundColor: theme.tint }]}
+					style={styles.publishBtn}
 					onPress={onPublish}
 					activeOpacity={0.92}
 				>
@@ -180,72 +156,104 @@ export default function ReviewPublish() {
 }
 
 const styles = StyleSheet.create({
-	safe: { flex: 1 },
+	safe: { flex: 1, backgroundColor: "#FAF7F2" },
 
 	header: {
-		paddingTop: 18,
-		paddingBottom: 14,
+		paddingTop: 60,
+		paddingBottom: 16,
+		paddingHorizontal: 20,
+		flexDirection: "row",
 		alignItems: "center",
+		justifyContent: "space-between",
+		backgroundColor: "#FAF7F2",
 		borderBottomWidth: 1,
 		borderBottomColor: "#E6E1DA",
 	},
-	headerTitle: { fontSize: 20, fontWeight: "900" },
-
-	content: { paddingHorizontal: 18, paddingTop: 18 },
-
-	videoBox: {
-		height: 220,
-		borderRadius: 18,
-		borderWidth: 1,
+	backBtn: {
+		width: 40,
+		height: 40,
 		alignItems: "center",
 		justifyContent: "center",
 	},
-	caption: { marginTop: 10, marginBottom: 16, fontSize: 16, fontWeight: "700" },
+	headerTitle: { fontSize: 20, fontWeight: "700", color: "#1F1F1F" },
+	placeholder: { width: 40 },
+
+	content: { paddingHorizontal: 18, paddingTop: 20 },
+
+	videoBox: {
+		height: 200,
+		borderRadius: 18,
+		backgroundColor: "#F1EDE6",
+		borderWidth: 1,
+		borderColor: "#E6E1DA",
+		alignItems: "center",
+		justifyContent: "center",
+		marginBottom: 12,
+	},
+	videoCaption: {
+		marginTop: 12,
+		fontSize: 15,
+		fontWeight: "600",
+		color: "#6F6A64",
+	},
 
 	card: {
+		backgroundColor: "#FFF",
 		borderWidth: 1,
+		borderColor: "#E6E1DA",
 		borderRadius: 18,
-		padding: 16,
+		padding: 18,
 		marginBottom: 14,
 	},
-	cardTitleRow: {
+	cardHeader: {
 		flexDirection: "row",
 		alignItems: "center",
 		gap: 10,
-		marginBottom: 12,
+		marginBottom: 14,
 	},
-	cardTitle: { fontSize: 20, fontWeight: "900" },
+	cardTitle: { fontSize: 18, fontWeight: "700", color: "#1F1F1F" },
 
 	chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
 	chip: {
 		paddingVertical: 10,
-		paddingHorizontal: 14,
-		borderRadius: 999,
+		paddingHorizontal: 16,
+		borderRadius: 20,
+		backgroundColor: "#F1EDE6",
 		borderWidth: 1,
+		borderColor: "#E6E1DA",
 	},
-	chipText: { fontSize: 15, fontWeight: "800" },
+	chipText: { fontSize: 15, fontWeight: "600", color: "#1F1F1F" },
 
-	locationText: { fontSize: 16, fontWeight: "700", lineHeight: 22 },
+	locationText: {
+		fontSize: 15,
+		fontWeight: "500",
+		color: "#6F6A64",
+		lineHeight: 22,
+	},
 
 	dashedUpload: {
-		height: 66,
+		height: 60,
 		borderRadius: 18,
 		borderWidth: 2,
 		borderStyle: "dashed",
+		borderColor: "#D97B3F",
+		backgroundColor: "#FFF",
 		alignItems: "center",
 		justifyContent: "center",
 		flexDirection: "row",
-		gap: 12,
+		gap: 10,
 		marginTop: 10,
+		marginBottom: 20,
 	},
-	dashedText: { fontSize: 18, fontWeight: "900" },
+	dashedText: { fontSize: 16, fontWeight: "700", color: "#D97B3F" },
 
 	publishBtn: {
-		height: 66,
-		borderRadius: 999,
+		height: 56,
+		borderRadius: 28,
+		backgroundColor: "#D97B3F",
 		alignItems: "center",
 		justifyContent: "center",
-		marginTop: 18,
+		marginTop: 10,
 	},
-	publishText: { color: "#fff", fontSize: 20, fontWeight: "900" },
+	publishText: { color: "#FFF", fontSize: 18, fontWeight: "700" },
 });

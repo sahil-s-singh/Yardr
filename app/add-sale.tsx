@@ -12,7 +12,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { router } from "expo-router";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
 	Alert,
 	Platform,
@@ -57,21 +57,21 @@ export default function AddSaleScreen() {
 		longitude: number;
 	} | null>(null);
 
-	useEffect(() => {
-		if (!isAuthenticated) {
-			Alert.alert(
-				"Sign in Required",
-				"Please sign in to create a garage sale listing",
-				[
-					{ text: "Cancel", onPress: () => router.back() },
-					{
-						text: "Sign In",
-						onPress: () => router.push("/auth/sign-in" as any),
-					},
-				]
-			);
-		}
-	}, [isAuthenticated]);
+	// useEffect(() => {
+	// 	if (!isAuthenticated) {
+	// 		Alert.alert(
+	// 			"Sign in Required",
+	// 			"Please sign in to create a garage sale listing",
+	// 			[
+	// 				{ text: "Cancel", onPress: () => router.back() },
+	// 				{
+	// 					text: "Sign In",
+	// 					onPress: () => router.push("/auth/sign-in" as any),
+	// 				},
+	// 			]
+	// 		);
+	// 	}
+	// }, [isAuthenticated]);
 
 	const handleVideoRecorded = async (
 		recordedVideoUri: string,

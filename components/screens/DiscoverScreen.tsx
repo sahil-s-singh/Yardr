@@ -1,9 +1,7 @@
 import * as Location from "expo-location";
-import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
 	ActivityIndicator,
-	Alert,
 	FlatList,
 	SafeAreaView,
 	StyleSheet,
@@ -17,7 +15,6 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { garageSaleService } from "@/services/garageSaleService";
 import { GarageSale } from "@/types/garageSale";
 
-import FloatingActionButton from "@/components/ui/FloatingActionButton";
 import HeaderBar from "@/components/ui/HeaderBar";
 import SaleCard from "@/components/ui/SaleCard";
 import SegmentedControl from "@/components/ui/SegmentedControl";
@@ -83,15 +80,15 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 
 				const perm = await Location.requestForegroundPermissionsAsync();
 				if (perm.status !== "granted") {
-					Alert.alert(
-						"Location Permission",
-						"Please enable location to discover nearby sales."
-					);
+					// Still load sales even without location permission
+					const list = await garageSaleService.getAllGarageSales();
+					setSales(list);
+					setAddressLine("Enable location for better results");
+					setLoading(false);
 					return;
 				}
 
-				// ✅ DO NOT pass Location.Accuracy.High (runtime crash)
-				const pos = await Location.getCurrentPositionAsync();
+				const pos = await Location.getCurrentPositionAsync({});
 
 				const loc = {
 					latitude: pos.coords.latitude,
@@ -111,10 +108,14 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 				setSales(list);
 			} catch (e: any) {
 				console.error(e);
-				Alert.alert(
-					"Error",
-					e?.message ?? "Something went wrong loading sales."
-				);
+				setAddressLine("Location unavailable");
+				// Still try to load sales
+				try {
+					const list = await garageSaleService.getAllGarageSales();
+					setSales(list);
+				} catch (err) {
+					console.error("Failed to load sales:", err);
+				}
 			} finally {
 				setLoading(false);
 			}
@@ -138,10 +139,6 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 		});
 	}, [sales, userLoc]);
 
-	const onPressPlus = () => {
-		router.push("/(tabs)/sell/video");
-	};
-
 	return (
 		<SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
 			<HeaderBar />
@@ -149,7 +146,7 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 			<View style={styles.content}>
 				<View style={styles.addressRow}>
 					<Text style={[styles.addressIcon, { color: theme.secondaryText }]}>
-						⌁
+						📍
 					</Text>
 					<Text
 						numberOfLines={1}
@@ -216,7 +213,7 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 				)}
 			</View>
 
-			<FloatingActionButton onPress={onPressPlus} />
+			{/* REMOVED: FloatingActionButton - using tab bar instead */}
 		</SafeAreaView>
 	);
 }

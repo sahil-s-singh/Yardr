@@ -50,12 +50,14 @@ export default function SaleDetailScreen() {
 				}
 			} else {
 				Alert.alert("Error", "Garage sale not found");
-				router.back();
+				if (router.canGoBack()) router.back();
+				else router.replace("/(tabs)");
 			}
 		} catch (error) {
 			console.error("Error loading sale:", error);
 			Alert.alert("Error", "Failed to load garage sale");
-			router.back();
+			if (router.canGoBack()) router.back();
+			else router.replace("/(tabs)");
 		} finally {
 			setLoading(false);
 		}

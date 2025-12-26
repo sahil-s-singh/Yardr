@@ -1,3 +1,4 @@
+// app/sell/_layout.tsx
 import { Stack } from "expo-router";
 import React from "react";
 
@@ -8,6 +9,7 @@ export default function SellLayout() {
 				headerShown: false,
 			}}
 		>
+			<Stack.Screen name="index" />
 			<Stack.Screen name="video" />
 			<Stack.Screen name="publish" />
 		</Stack>
