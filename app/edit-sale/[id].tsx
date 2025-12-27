@@ -142,7 +142,9 @@ export default function EditSaleScreen() {
 					>
 						<MaterialIcons name="arrow-back" size={24} color="#000" />
 					</TouchableOpacity>
-					<Text style={styles.headerTitle}>Edit Sale</Text>
+					<View style={styles.headerTitleContainer}>
+						<Text style={styles.headerTitle}>Edit Sale</Text>
+					</View>
 					<TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
 						<MaterialIcons name="delete" size={24} color="#FF3B30" />
 					</TouchableOpacity>
@@ -383,15 +385,15 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		alignItems: "center",
 	},
+	headerTitleContainer: {
+		flex: 1,
+		alignItems: "center",
+		justifyContent: "center",
+	},
 	headerTitle: {
-		position: "absolute",
-		left: 0,
-		right: 0,
-		textAlign: "center",
 		fontSize: 18,
 		fontWeight: "600",
 		color: "#000",
-		zIndex: -1,
 	},
 	scrollView: {
 		flex: 1,
