@@ -4,8 +4,9 @@ import ProfileAuthSheet from "@/components/profile/ProfileAuthSheet";
 import ProfileMenuSheet from "@/components/profile/ProfileMenuSheet";
 import ProfileSignupSheet from "@/components/profile/ProfileSignupSheet";
 import { useAuth } from "@/contexts/AuthContext";
-import { router } from "expo-router";
-import { useState } from "react";
+import { getMySales } from "@/services/garageSaleService";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
 	Alert,
 	ScrollView,
@@ -27,6 +28,27 @@ export default function ProfileScreen() {
 	const [showLogin, setShowLogin] = useState(false);
 	const [showSignup, setShowSignup] = useState(false);
 	const [showMenu, setShowMenu] = useState(false);
+	const [salesCount, setSalesCount] = useState(0);
+
+	// Load sales count when screen comes into focus
+	// This ensures the count updates after creating/deleting sales
+	// and uses the same source of truth as My Sales screen
+	useFocusEffect(
+		useCallback(() => {
+			if (user) {
+				const loadSalesCount = async () => {
+					try {
+						const sales = await getMySales(user.id);
+						setSalesCount(sales?.length || 0);
+					} catch (error) {
+						console.error("Error loading sales count:", error);
+						setSalesCount(0);
+					}
+				};
+				loadSalesCount();
+			}
+		}, [user])
+	);
 
 	// ---------------------------
 	// LOGGED OUT VIEW
@@ -89,7 +111,7 @@ export default function ProfileScreen() {
 				</View>
 
 				<View style={styles.stats}>
-					<Stat label="Sales" value="1" />
+					<Stat label="Sales" value={String(salesCount)} />
 					<Stat label="Saved" value="0" />
 					<Stat label="Visits" value="0" />
 				</View>
