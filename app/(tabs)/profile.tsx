@@ -5,12 +5,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+	Alert,
 	ScrollView,
 	StyleSheet,
 	Text,
 	TouchableOpacity,
 	View,
 } from "react-native";
+
+const showComingSoon = (feature: string) => {
+	Alert.alert("Coming soon!", `${feature} feature is coming soon.`, [
+		{ text: "OK" },
+	]);
+};
 
 export default function ProfileScreen() {
 	const { user, signOut } = useAuth();
@@ -44,7 +51,6 @@ export default function ProfileScreen() {
 					</View>
 				</View>
 
-				{/* LOGIN SHEET */}
 				<ProfileAuthSheet
 					visible={showLogin}
 					onClose={() => setShowLogin(false)}
@@ -54,7 +60,6 @@ export default function ProfileScreen() {
 					}}
 				/>
 
-				{/* SIGNUP SHEET */}
 				<ProfileSignupSheet
 					visible={showSignup}
 					onClose={() => setShowSignup(false)}
@@ -87,19 +92,26 @@ export default function ProfileScreen() {
 					<Stat label="Visits" value="0" />
 				</View>
 
-				{/* ✅ THIS IS THE IMPORTANT CHANGE */}
 				<MenuItem label="My Sales" onPress={() => router.push("/my-sales")} />
-				<MenuItem label="Saved Sales" />
-				<MenuItem label="Notifications" />
-				<MenuItem label="Settings" />
-				<MenuItem label="Help & Support" />
+				<MenuItem
+					label="Saved Sales"
+					onPress={() => showComingSoon("Saved Sales")}
+				/>
+				<MenuItem
+					label="Notifications"
+					onPress={() => showComingSoon("Notifications")}
+				/>
+				<MenuItem label="Settings" onPress={() => showComingSoon("Settings")} />
+				<MenuItem
+					label="Help & Support"
+					onPress={() => showComingSoon("Help & Support")}
+				/>
 
 				<TouchableOpacity style={styles.logout} onPress={signOut}>
 					<Text style={styles.logoutText}>Sign Out</Text>
 				</TouchableOpacity>
 			</ScrollView>
 
-			{/* This menu sheet is for OTHER actions, not My Sales */}
 			<ProfileMenuSheet visible={showMenu} onClose={() => setShowMenu(false)} />
 		</>
 	);
@@ -114,13 +126,9 @@ function Stat({ label, value }: { label: string; value: string }) {
 	);
 }
 
-function MenuItem({ label, onPress }: { label: string; onPress?: () => void }) {
+function MenuItem({ label, onPress }: { label: string; onPress: () => void }) {
 	return (
-		<TouchableOpacity
-			style={styles.menuItem}
-			onPress={onPress}
-			disabled={!onPress}
-		>
+		<TouchableOpacity style={styles.menuItem} onPress={onPress}>
 			<Text style={styles.menuText}>{label}</Text>
 			<Text style={styles.arrow}>›</Text>
 		</TouchableOpacity>

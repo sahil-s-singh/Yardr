@@ -1,12 +1,12 @@
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { ResizeMode, Video } from "expo-av";
-import * as ImagePicker from "expo-image-picker";
-import * as Location from "expo-location";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-	ActivityIndicator,
 	Alert,
 	Image,
+	KeyboardAvoidingView,
+	Platform,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -17,253 +17,285 @@ import {
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/contexts/AuthContext";
-import { garageSaleService } from "@/services/garageSaleService";
-import { rateLimitService } from "@/services/rateLimitService";
-
-// keep relative so it works even if @ alias breaks in app/
 import {
 	clearSellDraft,
 	loadSellDraft,
 	saveSellDraft,
-} from "../../lib/draftSale";
+	SellDraft,
+} from "@/lib/draftSale";
+import { garageSaleService } from "@/services/garageSaleService";
+import { rateLimitService } from "@/services/rateLimitService";
 
-function formatAddress(p: Location.LocationGeocodedAddress | undefined) {
-	if (!p) return "";
-	const parts = [
-		p.streetNumber,
-		p.street,
-		p.city,
-		p.region,
-		p.postalCode,
-	].filter(Boolean);
-	return parts.join(" ");
+// Step indicator component
+function StepHeader({ step }: { step: 1 | 2 | 3 }) {
+	return (
+		<View style={styles.stepWrap}>
+			<Text style={styles.screenTitle}>Add Sale</Text>
+
+			<View style={styles.stepsRow}>
+				<View style={styles.stepItem}>
+					<View style={[styles.stepCircle, step >= 1 && styles.stepActive]}>
+						<IconSymbol
+							size={20}
+							name="video.fill"
+							color={step >= 1 ? "#fff" : "#6F6A64"}
+						/>
+					</View>
+					<Text style={[styles.stepLabel, step >= 1 && styles.stepLabelActive]}>
+						Record Video
+					</Text>
+				</View>
+
+				<View style={[styles.stepLine, step >= 2 && styles.stepLineActive]} />
+
+				<View style={styles.stepItem}>
+					<View style={[styles.stepCircle, step >= 2 && styles.stepActive]}>
+						<IconSymbol
+							size={20}
+							name="eye.fill"
+							color={step >= 2 ? "#fff" : "#6F6A64"}
+						/>
+					</View>
+					<Text style={[styles.stepLabel, step >= 2 && styles.stepLabelActive]}>
+						Review
+					</Text>
+				</View>
+
+				<View style={[styles.stepLine, step >= 3 && styles.stepLineActive]} />
+
+				<View style={styles.stepItem}>
+					<View style={[styles.stepCircle, step >= 3 && styles.stepActive]}>
+						<IconSymbol
+							size={20}
+							name="checkmark.circle.fill"
+							color={step >= 3 ? "#fff" : "#6F6A64"}
+						/>
+					</View>
+					<Text style={[styles.stepLabel, step >= 3 && styles.stepLabelActive]}>
+						Publish
+					</Text>
+				</View>
+			</View>
+		</View>
+	);
 }
 
-function formatDate(date: Date) {
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, "0");
-	const day = String(date.getDate()).padStart(2, "0");
-	return `${year}-${month}-${day}`;
+// Date/time formatting helpers
+function yyyyMmDd(d: Date) {
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, "0");
+	const day = String(d.getDate()).padStart(2, "0");
+	return `${y}-${m}-${day}`;
 }
 
-function formatTime(date: Date) {
-	const hours = String(date.getHours()).padStart(2, "0");
-	const minutes = String(date.getMinutes()).padStart(2, "0");
-	return `${hours}:${minutes}`;
+function hhmm24(d: Date) {
+	const h = String(d.getHours()).padStart(2, "0");
+	const m = String(d.getMinutes()).padStart(2, "0");
+	return `${h}:${m}`;
 }
 
-export default function PublishScreen() {
-	const params = useLocalSearchParams<{ videoUri?: string }>();
-	const videoUri =
-		typeof params.videoUri === "string" ? params.videoUri : undefined;
+function prettyTime(d: Date) {
+	return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
 
+export default function PublishSaleScreen() {
 	const { user } = useAuth();
 
-	const [analyzing, setAnalyzing] = useState(false);
+	const [draft, setDraft] = useState<SellDraft | null>(null);
+	const [loading, setLoading] = useState(true);
 	const [publishing, setPublishing] = useState(false);
 
-	const [title, setTitle] = useState("");
-	const [description, setDescription] = useState("");
-	const [categories, setCategories] = useState<string[]>([]);
-	const [photos, setPhotos] = useState<string[]>([]);
+	// Contact fields
+	const [contactName, setContactName] = useState("");
+	const [phone, setPhone] = useState("");
+	const [email, setEmail] = useState("");
 
-	const [addressLine, setAddressLine] = useState("");
-	const [coords, setCoords] = useState<{
-		latitude: number;
-		longitude: number;
-	} | null>(null);
+	// Schedule fields
+	const [startDate, setStartDate] = useState<Date>(new Date());
+	const [endDate, setEndDate] = useState<Date>(new Date());
+	const [startTime, setStartTime] = useState<Date>(new Date());
+	const [endTime, setEndTime] = useState<Date>(new Date());
 
-	const maxPhotos = 8;
+	// Date/time picker visibility
+	const [showStartDate, setShowStartDate] = useState(false);
+	const [showEndDate, setShowEndDate] = useState(false);
+	const [showStartTime, setShowStartTime] = useState(false);
+	const [showEndTime, setShowEndTime] = useState(false);
 
+	// Load draft on mount
 	useEffect(() => {
+		let mounted = true;
+
 		(async () => {
-			// Load draft first (so if user comes back, they don’t lose work)
-			try {
-				const draft = await loadSellDraft();
-				if (draft) {
-					setTitle(draft.title || "");
-					setDescription(draft.description || "");
-					setCategories(
-						Array.isArray(draft.categories) ? draft.categories : []
-					);
-					setPhotos(Array.isArray(draft.photos) ? draft.photos : []);
-					setAddressLine(draft.addressLine || "");
-					if (draft.coords?.latitude && draft.coords?.longitude) {
-						setCoords({
-							latitude: draft.coords.latitude,
-							longitude: draft.coords.longitude,
-						});
-					}
-				}
-			} catch {}
+			const d = await loadSellDraft();
+			if (!mounted) return;
 
-			// Fetch location best-effort
-			try {
-				const perm = await Location.requestForegroundPermissionsAsync();
-				if (perm.status !== "granted") return;
+			setDraft(d);
 
-				const pos = await Location.getCurrentPositionAsync({});
-				const loc = {
-					latitude: pos.coords.latitude,
-					longitude: pos.coords.longitude,
-				};
-				setCoords(loc);
+			// Prefill contact info
+			setContactName(d?.contactName || "");
+			setPhone(d?.contactPhone || "");
+			setEmail(d?.contactEmail || user?.email || "");
 
-				const geos = await Location.reverseGeocodeAsync(loc);
-				const addr = formatAddress(geos?.[0]) || "Your location";
-				setAddressLine((prev) => prev || addr);
+			// Setup default dates/times
+			const today = new Date();
+			const defaultStart = new Date();
+			defaultStart.setHours(9, 0, 0, 0);
+			const defaultEnd = new Date();
+			defaultEnd.setHours(15, 0, 0, 0);
 
-				await saveSellDraft({
-					videoUri,
-					title,
-					description,
-					photos,
-					addressLine: addr,
-					categories,
-					coords: loc,
-				});
-			} catch {}
+			// Restore from draft if available
+			if (d?.startDate) {
+				const sd = new Date(d.startDate + "T00:00:00");
+				setStartDate(sd);
+			} else {
+				setStartDate(today);
+			}
+
+			if (d?.endDate) {
+				const ed = new Date(d.endDate + "T00:00:00");
+				setEndDate(ed);
+			} else {
+				setEndDate(today);
+			}
+
+			if (d?.startTime) {
+				const t = new Date();
+				const [hh, mm] = d.startTime.split(":").map(Number);
+				t.setHours(hh, mm, 0, 0);
+				setStartTime(t);
+			} else {
+				setStartTime(defaultStart);
+			}
+
+			if (d?.endTime) {
+				const t = new Date();
+				const [hh, mm] = d.endTime.split(":").map(Number);
+				t.setHours(hh, mm, 0, 0);
+				setEndTime(t);
+			} else {
+				setEndTime(defaultEnd);
+			}
+
+			setLoading(false);
 		})();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
 
-	// Auto-save draft on changes
+		return () => {
+			mounted = false;
+		};
+	}, [user]);
+
+	// Auto-save draft when fields change
 	useEffect(() => {
+		if (loading || !draft) return;
+
 		saveSellDraft({
-			videoUri,
-			title,
-			description,
-			photos,
-			addressLine,
-			categories,
-			coords,
+			...draft,
+			contactName,
+			contactPhone: phone,
+			contactEmail: email,
+			startDate: yyyyMmDd(startDate),
+			endDate: yyyyMmDd(endDate),
+			startTime: hhmm24(startTime),
+			endTime: hhmm24(endTime),
 		}).catch(() => {});
-	}, [videoUri, title, description, photos, addressLine, categories, coords]);
+	}, [
+		loading,
+		draft,
+		contactName,
+		phone,
+		email,
+		startDate,
+		endDate,
+		startTime,
+		endTime,
+	]);
 
-	const analyzeVideo = async () => {
-		setAnalyzing(true);
-		await new Promise((resolve) => setTimeout(resolve, 1200));
-
-		// only fill if empty (don’t overwrite edits)
-		setTitle((t) => (t ? t : "Multi-Family Garage Sale"));
-		setDescription((d) =>
-			d ? d : "Furniture, electronics, books, and household items"
+	// Validation
+	const canPublish = useMemo(() => {
+		return (
+			!!draft &&
+			!!draft.title &&
+			!!draft.description &&
+			contactName.trim().length > 0 &&
+			!!draft.addressLine
 		);
-		setCategories((c) =>
-			c?.length ? c : ["Furniture", "Electronics", "Books", "Clothing"]
-		);
+	}, [draft, contactName]);
 
-		setAnalyzing(false);
-	};
-
-	useEffect(() => {
-		if (videoUri) analyzeVideo();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [videoUri]);
-
-	const onUploadPhotos = async () => {
-		const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-		if (!perm.granted) {
+	// Publish handler
+	const handlePublish = async () => {
+		if (!draft || !canPublish) {
 			Alert.alert(
-				"Photos Permission",
-				"Please allow photo access to upload images."
+				"Missing information",
+				"Please complete all required fields."
 			);
 			return;
 		}
 
-		const remaining = maxPhotos - photos.length;
-		if (remaining <= 0) {
-			Alert.alert("Limit reached", `You can upload up to ${maxPhotos} photos.`);
-			return;
-		}
+		// Validate times
+		const startDateTime = new Date(startDate);
+		startDateTime.setHours(startTime.getHours(), startTime.getMinutes());
+		const endDateTime = new Date(endDate);
+		endDateTime.setHours(endTime.getHours(), endTime.getMinutes());
 
-		const res = await ImagePicker.launchImageLibraryAsync({
-			allowsMultipleSelection: true,
-			selectionLimit: remaining,
-			mediaTypes: ImagePicker.MediaTypeOptions.Images,
-			quality: 0.9,
-		});
-
-		if (!res.canceled) {
-			const uris = res.assets.map((a) => a.uri);
-			setPhotos((prev) => [...prev, ...uris].slice(0, maxPhotos));
-		}
-	};
-
-	const removePhoto = (uri: string) => {
-		setPhotos((prev) => prev.filter((p) => p !== uri));
-	};
-
-	const canPublish = useMemo(() => {
-		return title.trim().length > 0 && description.trim().length > 0 && !!coords;
-	}, [title, description, coords]);
-
-	const onPublish = async () => {
-		if (publishing) return;
-
-		if (!canPublish) {
+		if (endDateTime <= startDateTime) {
 			Alert.alert(
-				"Missing info",
-				!coords
-					? "We need your location to pin the sale on the map. Please enable location permission."
-					: "Please add at least a title and description before publishing."
+				"Invalid time",
+				"End date/time must be after start date/time."
 			);
 			return;
 		}
 
 		setPublishing(true);
+
 		try {
+			// Check rate limit
+			const rateCheck = await rateLimitService.checkRateLimit();
+			if (!rateCheck.allowed) {
+				Alert.alert(
+					"Posting Limit Reached",
+					rateCheck.message || "You have reached the posting limit."
+				);
+				setPublishing(false);
+				return;
+			}
+
+			// Get device ID
 			const deviceId = await rateLimitService.getDeviceId();
 
-			// For now: publish as a simple single-day sale, 9am-5pm default.
-			// You can wire real date/time pickers later.
-			const start = new Date();
-			const end = new Date();
-			end.setHours(Math.min(23, start.getHours() + 6));
-
+			// Create garage sale
 			await garageSaleService.addGarageSale(
 				{
-					title: title.trim(),
-					description: description.trim(),
+					title: draft.title!,
+					description: draft.description!,
+					categories: draft.categories || [],
 					location: {
-						latitude: coords!.latitude,
-						longitude: coords!.longitude,
-						address: addressLine || "Your location",
+						latitude: draft.coords?.latitude || 52.1332,
+						longitude: draft.coords?.longitude || -106.67,
+						address: draft.addressLine || "Sale location",
 					},
-					date: formatDate(start),
-					startDate: formatDate(start),
-					endDate: formatDate(start),
-					startTime: formatTime(start),
-					endTime: formatTime(end),
-					categories,
-					contactName: user?.email || "Seller",
-					contactPhone: undefined,
-					contactEmail: user?.email || undefined,
-					videoUrl: videoUri || undefined,
-					images: photos.length ? photos : undefined,
+					date: yyyyMmDd(startDate),
+					startDate: yyyyMmDd(startDate),
+					endDate: yyyyMmDd(endDate),
+					startTime: hhmm24(startTime),
+					endTime: hhmm24(endTime),
+					contactName: contactName.trim(),
+					contactPhone: phone.trim() || undefined,
+					contactEmail: email.trim() || undefined,
+					videoUrl: draft.videoUri || undefined,
+					images: draft.photos || undefined,
 					isActive: true,
 				},
 				deviceId,
 				user?.id
 			);
 
+			// Clear draft and navigate to success
 			await clearSellDraft();
-
-			Alert.alert("Success", "Your garage sale is live!", [
-				{
-					text: "OK",
-					onPress: () => {
-						// Go back to Discover. Discover auto-refreshes via useFocusEffect.
-						router.replace("/(tabs)");
-					},
-				},
-			]);
-		} catch (e: any) {
-			console.error("Publish error:", e);
-			Alert.alert(
-				"Error",
-				e?.message || "Failed to publish. Please try again."
-			);
+			router.replace("/sell/success");
+		} catch (e) {
+			console.error(e);
+			Alert.alert("Error", "Failed to publish sale. Please try again.");
 		} finally {
 			setPublishing(false);
 		}
@@ -274,160 +306,274 @@ export default function PublishScreen() {
 		else router.replace("/(tabs)");
 	};
 
+	if (loading || !draft) {
+		return null;
+	}
+
 	return (
-		<View style={styles.safe}>
-			<View style={styles.header}>
+		<KeyboardAvoidingView
+			style={styles.safe}
+			behavior={Platform.OS === "ios" ? "padding" : undefined}
+		>
+			<View style={styles.topBar}>
 				<TouchableOpacity onPress={goBack} style={styles.backBtn}>
 					<IconSymbol size={24} name="chevron.left" color="#1F1F1F" />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Review & Publish</Text>
-				<View style={styles.placeholder} />
+				<View style={{ width: 40 }} />
 			</View>
 
 			<ScrollView
 				contentContainerStyle={styles.content}
 				showsVerticalScrollIndicator={false}
 			>
-				{videoUri ? (
-					<View style={styles.videoBox}>
-						<Video
-							source={{ uri: videoUri }}
-							style={styles.video}
-							useNativeControls
-							resizeMode={ResizeMode.COVER}
-							isLooping
+				<StepHeader step={3} />
+
+				{/* Video Preview */}
+				{draft.videoUri && (
+					<>
+						<Text style={styles.sectionTitle}>Video Preview</Text>
+						<View style={styles.videoBox}>
+							<Video
+								source={{ uri: draft.videoUri }}
+								style={styles.video}
+								useNativeControls
+								resizeMode={ResizeMode.COVER}
+								isLooping
+							/>
+						</View>
+					</>
+				)}
+
+				{/* AI-Generated Tags */}
+				{draft.categories && draft.categories.length > 0 && (
+					<View style={styles.card}>
+						<View style={styles.rowHeader}>
+							<IconSymbol size={18} name="tag.fill" color="#D97B3F" />
+							<Text style={styles.cardTitle}>AI-Generated Tags</Text>
+						</View>
+
+						<View style={styles.chips}>
+							{draft.categories.map((c, idx) => (
+								<View key={idx} style={styles.chip}>
+									<Text style={styles.chipText}>{c}</Text>
+								</View>
+							))}
+						</View>
+					</View>
+				)}
+
+				{/* Detected Location */}
+				{draft.addressLine && (
+					<View style={styles.card}>
+						<View style={styles.rowHeader}>
+							<IconSymbol size={18} name="location.fill" color="#D97B3F" />
+							<Text style={styles.cardTitle}>Detected Location</Text>
+						</View>
+
+						<View style={styles.locationBox}>
+							<Text style={styles.locationText}>📍 {draft.addressLine}</Text>
+						</View>
+					</View>
+				)}
+
+				{/* Additional Photos */}
+				{draft.photos && draft.photos.length > 0 && (
+					<>
+						<Text style={styles.sectionTitle}>
+							Additional Photos ({draft.photos.length})
+						</Text>
+						<View style={styles.photoGrid}>
+							{draft.photos.map((uri, idx) => (
+								<Image key={idx} source={{ uri }} style={styles.photo} />
+							))}
+						</View>
+					</>
+				)}
+
+				{/* Sale Schedule */}
+				<View style={styles.card}>
+					<View style={styles.rowHeader}>
+						<IconSymbol size={18} name="calendar" color="#D97B3F" />
+						<Text style={styles.cardTitle}>Sale Schedule</Text>
+					</View>
+
+					<View style={styles.dateRow}>
+						<View style={styles.halfField}>
+							<Text style={styles.label}>Start Date *</Text>
+							<TouchableOpacity
+								style={styles.input}
+								onPress={() => setShowStartDate(true)}
+							>
+								<IconSymbol size={16} name="calendar" color="#6F6A64" />
+								<Text style={styles.inputText}>{yyyyMmDd(startDate)}</Text>
+							</TouchableOpacity>
+						</View>
+
+						<View style={styles.halfField}>
+							<Text style={styles.label}>Start Time *</Text>
+							<TouchableOpacity
+								style={styles.input}
+								onPress={() => setShowStartTime(true)}
+							>
+								<IconSymbol size={16} name="clock.fill" color="#6F6A64" />
+								<Text style={styles.inputText}>{prettyTime(startTime)}</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+
+					<View style={styles.dateRow}>
+						<View style={styles.halfField}>
+							<Text style={styles.label}>End Date *</Text>
+							<TouchableOpacity
+								style={styles.input}
+								onPress={() => setShowEndDate(true)}
+							>
+								<IconSymbol size={16} name="calendar" color="#6F6A64" />
+								<Text style={styles.inputText}>{yyyyMmDd(endDate)}</Text>
+							</TouchableOpacity>
+						</View>
+
+						<View style={styles.halfField}>
+							<Text style={styles.label}>End Time *</Text>
+							<TouchableOpacity
+								style={styles.input}
+								onPress={() => setShowEndTime(true)}
+							>
+								<IconSymbol size={16} name="clock.fill" color="#6F6A64" />
+								<Text style={styles.inputText}>{prettyTime(endTime)}</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+				</View>
+
+				{/* Contact Information */}
+				<View style={styles.card}>
+					<View style={styles.rowHeader}>
+						<IconSymbol size={18} name="person.fill" color="#D97B3F" />
+						<Text style={styles.cardTitle}>Contact Information</Text>
+					</View>
+
+					<Text style={styles.label}>Name *</Text>
+					<View style={styles.inputWithIcon}>
+						<IconSymbol size={16} name="person.fill" color="#6F6A64" />
+						<TextInput
+							style={styles.textInput}
+							value={contactName}
+							onChangeText={setContactName}
+							placeholder="Demo User"
+							placeholderTextColor="#999"
 						/>
 					</View>
-				) : (
-					<View style={styles.noVideoBox}>
-						<IconSymbol size={48} name="video" color="#9A928A" />
-						<Text style={styles.noVideoText}>No video recorded</Text>
-					</View>
-				)}
 
-				{analyzing && (
-					<View style={styles.analyzingCard}>
-						<ActivityIndicator size="small" color="#D97B3F" />
-						<Text style={styles.analyzingText}>
-							AI is analyzing your video...
-						</Text>
-					</View>
-				)}
-
-				<View style={styles.card}>
-					<View style={styles.cardHeader}>
-						<IconSymbol size={20} name="tag" color="#D97B3F" />
-						<Text style={styles.cardTitle}>Details</Text>
+					<Text style={styles.label}>Phone Number *</Text>
+					<View style={styles.inputWithIcon}>
+						<IconSymbol size={16} name="phone.fill" color="#6F6A64" />
+						<TextInput
+							style={styles.textInput}
+							value={phone}
+							onChangeText={setPhone}
+							placeholder="(555) 123-4567"
+							placeholderTextColor="#999"
+							keyboardType="phone-pad"
+						/>
 					</View>
 
-					<Text style={styles.label}>Title</Text>
-					<TextInput
-						value={title}
-						onChangeText={setTitle}
-						placeholder="e.g. Garage Sale"
-						style={styles.input}
-					/>
-
-					<Text style={styles.label}>Description</Text>
-					<TextInput
-						value={description}
-						onChangeText={setDescription}
-						placeholder="What are you selling?"
-						style={[styles.input, styles.textarea]}
-						multiline
-					/>
-
-					<Text style={styles.label}>Categories (comma separated)</Text>
-					<TextInput
-						value={categories.join(", ")}
-						onChangeText={(t) =>
-							setCategories(
-								t
-									.split(",")
-									.map((s) => s.trim())
-									.filter(Boolean)
-							)
-						}
-						placeholder="Furniture, Electronics, Toys"
-						style={styles.input}
-					/>
+					<Text style={styles.label}>Email *</Text>
+					<View style={styles.inputWithIcon}>
+						<IconSymbol size={16} name="envelope.fill" color="#6F6A64" />
+						<TextInput
+							style={styles.textInput}
+							value={email}
+							onChangeText={setEmail}
+							placeholder="mail.example@gmail.com"
+							placeholderTextColor="#999"
+							keyboardType="email-address"
+							autoCapitalize="none"
+						/>
+					</View>
 				</View>
 
-				<View style={styles.card}>
-					<View style={styles.cardHeader}>
-						<IconSymbol size={20} name="location.fill" color="#D97B3F" />
-						<Text style={styles.cardTitle}>Location</Text>
-					</View>
-					<Text style={styles.locationText}>
-						{addressLine || "Fetching your location..."}
-					</Text>
-					{!coords && (
-						<Text style={styles.locationHint}>
-							Enable location permission so your sale can appear on the map.
-						</Text>
-					)}
-				</View>
+				<View style={{ height: 110 }} />
+			</ScrollView>
 
-				<TouchableOpacity
-					style={styles.dashedUpload}
-					onPress={onUploadPhotos}
-					activeOpacity={0.8}
-				>
-					<IconSymbol size={24} name="square.and.arrow.up" color="#D97B3F" />
-					<Text style={styles.dashedText}>
-						Upload Additional Photos {photos.length > 0 && `(${photos.length})`}
-					</Text>
-				</TouchableOpacity>
-
-				{photos.length > 0 && (
-					<View style={styles.photoGrid}>
-						{photos.map((uri) => (
-							<View key={uri} style={styles.photoItem}>
-								<Image source={{ uri }} style={styles.photo} />
-								<TouchableOpacity
-									style={styles.removePhoto}
-									onPress={() => removePhoto(uri)}
-								>
-									<Text style={styles.removePhotoText}>×</Text>
-								</TouchableOpacity>
-							</View>
-						))}
-					</View>
-				)}
-
+			{/* Publish Button */}
+			<View style={styles.bottomBar}>
 				<TouchableOpacity
 					style={[
 						styles.publishBtn,
-						(!canPublish || publishing) && { opacity: 0.6 },
+						(!canPublish || publishing) && { opacity: 0.5 },
 					]}
-					onPress={onPublish}
-					activeOpacity={0.92}
+					onPress={handlePublish}
 					disabled={!canPublish || publishing}
+					activeOpacity={0.92}
 				>
+					<IconSymbol size={20} name="checkmark.circle.fill" color="#fff" />
 					<Text style={styles.publishText}>
 						{publishing ? "Publishing..." : "Publish Sale"}
 					</Text>
 				</TouchableOpacity>
+			</View>
 
-				<View style={{ height: 120 }} />
-			</ScrollView>
-		</View>
+			{/* Date/Time Pickers */}
+			{showStartDate && (
+				<DateTimePicker
+					value={startDate}
+					mode="date"
+					minimumDate={new Date()}
+					onChange={(_, d) => {
+						setShowStartDate(false);
+						if (d) setStartDate(d);
+					}}
+				/>
+			)}
+
+			{showEndDate && (
+				<DateTimePicker
+					value={endDate}
+					mode="date"
+					minimumDate={startDate}
+					onChange={(_, d) => {
+						setShowEndDate(false);
+						if (d) setEndDate(d);
+					}}
+				/>
+			)}
+
+			{showStartTime && (
+				<DateTimePicker
+					value={startTime}
+					mode="time"
+					onChange={(_, d) => {
+						setShowStartTime(false);
+						if (d) setStartTime(d);
+					}}
+				/>
+			)}
+
+			{showEndTime && (
+				<DateTimePicker
+					value={endTime}
+					mode="time"
+					onChange={(_, d) => {
+						setShowEndTime(false);
+						if (d) setEndTime(d);
+					}}
+				/>
+			)}
+		</KeyboardAvoidingView>
 	);
 }
 
 const styles = StyleSheet.create({
 	safe: { flex: 1, backgroundColor: "#FAF7F2" },
 
-	header: {
-		paddingTop: 60,
-		paddingBottom: 16,
-		paddingHorizontal: 20,
+	topBar: {
+		paddingTop: 56,
+		paddingHorizontal: 18,
+		paddingBottom: 8,
 		flexDirection: "row",
-		alignItems: "center",
 		justifyContent: "space-between",
-		backgroundColor: "#FAF7F2",
-		borderBottomWidth: 1,
-		borderBottomColor: "#E6E1DA",
+		alignItems: "center",
 	},
 	backBtn: {
 		width: 40,
@@ -435,58 +581,79 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 	},
-	headerTitle: { fontSize: 20, fontWeight: "700", color: "#1F1F1F" },
-	placeholder: { width: 40 },
 
-	content: { paddingHorizontal: 18, paddingTop: 20 },
+	content: { paddingHorizontal: 18, paddingTop: 6 },
 
-	videoBox: {
-		height: 200,
-		borderRadius: 18,
-		backgroundColor: "#000",
-		overflow: "hidden",
-		marginBottom: 12,
-	},
-	video: { width: "100%", height: "100%" },
-	noVideoBox: {
-		height: 200,
-		borderRadius: 18,
-		backgroundColor: "#F1EDE6",
-		borderWidth: 1,
-		borderColor: "#E6E1DA",
-		alignItems: "center",
-		justifyContent: "center",
-		marginBottom: 12,
-	},
-	noVideoText: {
-		marginTop: 12,
-		fontSize: 15,
-		fontWeight: "600",
-		color: "#6F6A64",
+	screenTitle: {
+		textAlign: "center",
+		fontSize: 22,
+		fontWeight: "800",
+		color: "#1F1F1F",
 	},
 
-	analyzingCard: {
-		backgroundColor: "#FFF",
-		borderWidth: 1,
-		borderColor: "#E6E1DA",
-		borderRadius: 18,
-		padding: 20,
-		marginBottom: 14,
+	// Step indicator
+	stepWrap: { marginBottom: 10 },
+	stepsRow: {
+		marginTop: 14,
 		flexDirection: "row",
 		alignItems: "center",
-		gap: 12,
+		justifyContent: "center",
 	},
-	analyzingText: { fontSize: 15, fontWeight: "600", color: "#6F6A64" },
+	stepItem: { alignItems: "center", width: 110 },
+	stepCircle: {
+		width: 52,
+		height: 52,
+		borderRadius: 26,
+		backgroundColor: "#F1EDE6",
+		alignItems: "center",
+		justifyContent: "center",
+		borderWidth: 1,
+		borderColor: "#E6E1DA",
+	},
+	stepActive: { backgroundColor: "#D97B3F", borderColor: "#D97B3F" },
+	stepLabel: {
+		marginTop: 8,
+		fontSize: 13,
+		color: "#6F6A64",
+		fontWeight: "700",
+	},
+	stepLabelActive: { color: "#D97B3F" },
+	stepLine: {
+		height: 4,
+		width: 44,
+		borderRadius: 2,
+		backgroundColor: "#E6E1DA",
+	},
+	stepLineActive: { backgroundColor: "#D97B3F" },
 
+	sectionTitle: {
+		marginTop: 14,
+		marginBottom: 10,
+		fontSize: 16,
+		fontWeight: "800",
+		color: "#1F1F1F",
+	},
+
+	// Video
+	videoBox: {
+		height: 210,
+		borderRadius: 18,
+		overflow: "hidden",
+		backgroundColor: "#000",
+		marginBottom: 14,
+	},
+	video: { width: "100%", height: "100%" },
+
+	// Cards
 	card: {
+		marginTop: 14,
 		backgroundColor: "#FFF",
 		borderWidth: 1,
 		borderColor: "#E6E1DA",
 		borderRadius: 18,
-		padding: 18,
-		marginBottom: 14,
+		padding: 16,
 	},
-	cardHeader: {
+	rowHeader: {
 		flexDirection: "row",
 		alignItems: "center",
 		gap: 10,
@@ -494,80 +661,106 @@ const styles = StyleSheet.create({
 	},
 	cardTitle: { fontSize: 16, fontWeight: "800", color: "#1F1F1F" },
 
-	label: {
-		fontSize: 13,
-		fontWeight: "700",
-		color: "#6F6A64",
-		marginTop: 10,
-		marginBottom: 6,
+	// Tags
+	chips: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+	chip: {
+		backgroundColor: "#F7E6D9",
+		paddingVertical: 8,
+		paddingHorizontal: 14,
+		borderRadius: 999,
 	},
-	input: {
+	chipText: { color: "#D97B3F", fontWeight: "800", fontSize: 14 },
+
+	// Location
+	locationBox: {
 		borderWidth: 1,
 		borderColor: "#E6E1DA",
-		borderRadius: 12,
-		paddingHorizontal: 12,
-		paddingVertical: 10,
+		borderRadius: 14,
 		backgroundColor: "#FAF7F2",
-		fontSize: 15,
-		color: "#1F1F1F",
+		paddingHorizontal: 14,
+		paddingVertical: 14,
 	},
-	textarea: { minHeight: 90, textAlignVertical: "top" },
-
 	locationText: { fontSize: 15, fontWeight: "700", color: "#1F1F1F" },
-	locationHint: { marginTop: 8, fontSize: 13, color: "#6F6A64" },
 
-	dashedUpload: {
-		borderWidth: 1,
-		borderColor: "#D97B3F",
-		borderStyle: "dashed",
-		borderRadius: 18,
-		padding: 16,
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 10,
-		backgroundColor: "#FFF",
-		marginBottom: 12,
-	},
-	dashedText: { fontSize: 15, fontWeight: "700", color: "#D97B3F" },
-
+	// Photos
 	photoGrid: {
 		flexDirection: "row",
 		flexWrap: "wrap",
-		gap: 10,
+		gap: 12,
 		marginBottom: 14,
 	},
-	photoItem: {
-		width: 90,
-		height: 90,
+	photo: {
+		width: 108,
+		height: 108,
 		borderRadius: 14,
-		overflow: "hidden",
-		position: "relative",
-	},
-	photo: { width: "100%", height: "100%" },
-	removePhoto: {
-		position: "absolute",
-		top: 6,
-		right: 6,
-		width: 22,
-		height: 22,
-		borderRadius: 11,
-		backgroundColor: "rgba(0,0,0,0.65)",
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	removePhotoText: {
-		color: "#fff",
-		fontSize: 18,
-		lineHeight: 18,
-		fontWeight: "800",
+		backgroundColor: "#E6E1DA",
 	},
 
+	// Form fields
+	label: {
+		marginTop: 12,
+		marginBottom: 8,
+		fontSize: 13,
+		color: "#6F6A64",
+		fontWeight: "800",
+	},
+	input: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 10,
+		borderWidth: 1,
+		borderColor: "#E6E1DA",
+		borderRadius: 14,
+		paddingHorizontal: 14,
+		paddingVertical: 14,
+		backgroundColor: "#FAF7F2",
+	},
+	inputText: { fontSize: 15, color: "#1F1F1F", fontWeight: "600" },
+
+	inputWithIcon: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 10,
+		borderWidth: 1,
+		borderColor: "#E6E1DA",
+		borderRadius: 14,
+		paddingHorizontal: 14,
+		paddingVertical: 14,
+		backgroundColor: "#FAF7F2",
+	},
+	textInput: {
+		flex: 1,
+		fontSize: 15,
+		color: "#1F1F1F",
+		fontWeight: "600",
+	},
+
+	dateRow: {
+		flexDirection: "row",
+		gap: 12,
+	},
+	halfField: { flex: 1 },
+
+	// Bottom bar
+	bottomBar: {
+		position: "absolute",
+		left: 0,
+		right: 0,
+		bottom: 0,
+		padding: 16,
+		backgroundColor: "rgba(250,247,242,0.92)",
+		borderTopWidth: 1,
+		borderTopColor: "#E6E1DA",
+	},
 	publishBtn: {
 		backgroundColor: "#D97B3F",
-		borderRadius: 18,
-		paddingVertical: 16,
+		borderRadius: 24,
+		paddingVertical: 18,
+		paddingHorizontal: 22,
+		flexDirection: "row",
 		alignItems: "center",
-		marginTop: 6,
+		justifyContent: "center",
+		gap: 10,
 	},
-	publishText: { fontSize: 16, fontWeight: "800", color: "#fff" },
+	publishText: { color: "#fff", fontWeight: "900", fontSize: 18 },
 });

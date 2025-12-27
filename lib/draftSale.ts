@@ -2,13 +2,32 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const KEY = "yardr:sellDraft:v1";
 
+export type SellCoords = {
+	latitude: number;
+	longitude: number;
+};
+
 export type SellDraft = {
+	// Step 1
 	videoUri?: string;
+
+	// Step 2 (Review)
 	title?: string;
 	description?: string;
+	categories?: string[];
 	photos?: string[];
 	addressLine?: string;
-	categories?: string[];
+	coords?: SellCoords;
+
+	// Step 3 (Publish)
+	contactName?: string;
+	contactPhone?: string;
+	contactEmail?: string;
+	startDate?: string; // YYYY-MM-DD
+	endDate?: string; // YYYY-MM-DD
+	startTime?: string; // HH:mm (24h)
+	endTime?: string; // HH:mm (24h)
+
 	updatedAt?: number;
 };
 
