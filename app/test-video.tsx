@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
 	},
 	backButtonText: {
 		fontSize: 16,
-		color: "#0066FF",
+		color: "#DF6B4F",
 	},
 	content: {
 		flex: 1,
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
 		marginBottom: 10,
 	},
 	startButton: {
-		backgroundColor: "#0066FF",
+		backgroundColor: "#DF6B4F",
 		padding: 20,
 		borderRadius: 10,
 		alignItems: "center",

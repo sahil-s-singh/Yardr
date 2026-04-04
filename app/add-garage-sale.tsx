@@ -509,6 +509,8 @@ export default function AddGarageSaleScreen() {
 						address: form.address,
 					},
 					date: startDate,
+					startDate: startDate,
+					endDate: startDate,
 					startTime: startTime,
 					endTime: endTime,
 					categories: form.selectedCategories,
@@ -910,7 +912,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	submitButton: {
-		backgroundColor: "#0066FF",
+		backgroundColor: "#DF6B4F",
 		padding: 16,
 		borderRadius: 10,
 		alignItems: "center",

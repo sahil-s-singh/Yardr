@@ -1,8 +1,12 @@
 // app/my-sales.tsx
+import GradientBackground from "@/components/ui/GradientBackground";
+import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { deleteSale, getMySales } from "@/services/garageSaleService";
+import { MaterialIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
 	Alert,
 	Image,
@@ -16,27 +20,29 @@ import {
 
 export default function MySalesScreen() {
 	const { user } = useAuth();
+	const colorScheme = useColorScheme();
+	const theme = Colors[colorScheme ?? "light"];
 	const [sales, setSales] = useState<any[]>([]);
 	const [loading, setLoading] = useState(true);
 
-	// Redirect if not logged in
-	if (!user) {
-		router.replace("/profile");
-		return null;
-	}
+	// Redirect if not logged in (in useEffect to avoid hooks violation)
+	useEffect(() => {
+		if (!user) {
+			router.replace("/(tabs)/profile");
+		}
+	}, [user]);
 
-	const load = async () => {
-		setLoading(true);
-		const data = await getMySales(user.id);
-		setSales(data || []);
-		setLoading(false);
-	};
-
-	// Reload when screen comes into focus
 	useFocusEffect(
 		useCallback(() => {
+			if (!user) return;
+			const load = async () => {
+				setLoading(true);
+				const data = await getMySales(user.id);
+				setSales(data || []);
+				setLoading(false);
+			};
 			load();
-		}, [])
+		}, [user])
 	);
 
 	const confirmDelete = (id: string) => {
@@ -53,64 +59,102 @@ export default function MySalesScreen() {
 		]);
 	};
 
+	if (!user) return null;
+
 	return (
-		<SafeAreaView style={styles.safe}>
+		<SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+			<GradientBackground />
+
 			{/* HEADER */}
 			<View style={styles.header}>
 				<TouchableOpacity onPress={() => router.back()}>
-					<Text style={styles.back}>‹</Text>
+					<MaterialIcons name="chevron-left" size={28} color={theme.text} />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>My Sales</Text>
-				<View style={{ width: 24 }} />
+				<Text style={[styles.headerTitle, { color: theme.text }]}>
+					My Sales
+				</Text>
+				<View style={{ width: 28 }} />
 			</View>
 
-			<ScrollView style={styles.container}>
+			<ScrollView
+				style={styles.container}
+				contentContainerStyle={{ paddingBottom: 40 }}
+			>
 				{/* EMPTY STATE */}
 				{!loading && sales.length === 0 && (
 					<View style={styles.empty}>
-						<Text style={styles.emptyTitle}>No sales yet</Text>
-						<Text style={styles.emptySub}>
+						<MaterialIcons
+							name="storefront"
+							size={48}
+							color={theme.secondaryText}
+						/>
+						<Text style={[styles.emptyTitle, { color: theme.text }]}>
+							No sales yet
+						</Text>
+						<Text style={[styles.emptySub, { color: theme.secondaryText }]}>
 							Create a sale to start reaching buyers nearby.
 						</Text>
 					</View>
 				)}
 
-				{sales.map((sale) => (
-					<View key={sale.id} style={styles.card}>
-						<Image
-							source={{
-								uri:
-									sale.cover_image ||
-									"https://via.placeholder.com/600x400?text=Garage+Sale",
-							}}
-							style={styles.image}
-						/>
+				{sales.map((sale) => {
+					const imageUri =
+						sale.images?.[0] || sale.video_url || null;
 
-						<View style={styles.info}>
-							<Text style={styles.name}>{sale.title}</Text>
-							<Text style={styles.meta}>
-								{new Date(sale.start_date).toDateString()}
-							</Text>
-							<Text style={styles.meta}>{sale.items?.length || 0} items</Text>
-						</View>
+					return (
+						<View
+							key={sale.id}
+							style={[styles.card, { backgroundColor: theme.card }]}
+						>
+							{imageUri ? (
+								<Image
+									source={{ uri: imageUri }}
+									style={styles.image}
+								/>
+							) : (
+								<View
+									style={[styles.imagePlaceholder, { backgroundColor: theme.muted }]}
+								>
+									<MaterialIcons
+										name="photo"
+										size={32}
+										color={theme.secondaryText}
+									/>
+								</View>
+							)}
 
-						<View style={styles.actions}>
-							<ActionBtn
-								label="View"
-								onPress={() => router.push(`/sale-detail/${sale.id}`)}
-							/>
-							<ActionBtn
-								label="Edit"
-								onPress={() => router.push(`/edit-sale/${sale.id}`)}
-							/>
-							<ActionBtn
-								label="Delete"
-								danger
-								onPress={() => confirmDelete(sale.id)}
-							/>
+							<View style={styles.info}>
+								<Text style={[styles.name, { color: theme.text }]}>
+									{sale.title}
+								</Text>
+								<Text style={[styles.meta, { color: theme.secondaryText }]}>
+									{sale.start_date
+										? new Date(sale.start_date + "T00:00:00").toDateString()
+										: "No date"}
+								</Text>
+							</View>
+
+							<View style={styles.actions}>
+								<ActionBtn
+									label="View"
+									theme={theme}
+									onPress={() => router.push(`/sale-detail/${sale.id}`)}
+								/>
+								<ActionBtn
+									label="Edit"
+									theme={theme}
+									onPress={() => router.push(`/edit-sale/${sale.id}`)}
+								/>
+								<ActionBtn
+									label="Delete"
+									theme={theme}
+									danger
+									onPress={() => confirmDelete(sale.id)}
+								/>
+							</View>
 						</View>
-					</View>
-				))}
+					);
+				})}
 			</ScrollView>
 		</SafeAreaView>
 	);
@@ -120,17 +164,27 @@ function ActionBtn({
 	label,
 	onPress,
 	danger,
+	theme,
 }: {
 	label: string;
 	onPress: () => void;
 	danger?: boolean;
+	theme: any;
 }) {
 	return (
 		<TouchableOpacity
-			style={[styles.btn, danger && styles.btnDanger]}
+			style={[
+				styles.btn,
+				{ borderColor: danger ? "#E05244" : theme.border },
+			]}
 			onPress={onPress}
 		>
-			<Text style={[styles.btnText, danger && styles.btnDangerText]}>
+			<Text
+				style={[
+					styles.btnText,
+					{ color: danger ? "#E05244" : theme.text },
+				]}
+			>
 				{label}
 			</Text>
 		</TouchableOpacity>
@@ -138,19 +192,18 @@ function ActionBtn({
 }
 
 const styles = StyleSheet.create({
-	safe: { flex: 1, backgroundColor: "#FAF7F2" },
+	safe: { flex: 1 },
 
 	header: {
 		flexDirection: "row",
 		alignItems: "center",
-		paddingHorizontal: 20,
+		paddingHorizontal: 16,
 		paddingBottom: 10,
 	},
-	back: { fontSize: 28, fontWeight: "700" },
 	headerTitle: {
 		flex: 1,
 		textAlign: "center",
-		fontSize: 22,
+		fontSize: 20,
 		fontWeight: "800",
 	},
 
@@ -160,39 +213,46 @@ const styles = StyleSheet.create({
 		marginTop: 80,
 		alignItems: "center",
 	},
-	emptyTitle: { fontSize: 20, fontWeight: "700" },
-	emptySub: { color: "#777", marginTop: 6, textAlign: "center" },
+	emptyTitle: { fontSize: 20, fontWeight: "700", marginTop: 12 },
+	emptySub: { marginTop: 6, textAlign: "center", lineHeight: 20 },
 
 	card: {
-		backgroundColor: "#fff",
-		borderRadius: 20,
+		borderRadius: 22,
 		padding: 14,
 		marginBottom: 16,
+		shadowColor: "#000",
+		shadowOpacity: 0.04,
+		shadowRadius: 16,
+		shadowOffset: { width: 0, height: 4 },
+		elevation: 2,
 	},
 	image: {
 		width: "100%",
 		height: 180,
-		borderRadius: 14,
+		borderRadius: 16,
+	},
+	imagePlaceholder: {
+		width: "100%",
+		height: 180,
+		borderRadius: 16,
+		alignItems: "center",
+		justifyContent: "center",
 	},
 	info: { marginTop: 10 },
 	name: { fontSize: 18, fontWeight: "700" },
-	meta: { color: "#777", marginTop: 2 },
+	meta: { marginTop: 2, fontSize: 14 },
 
 	actions: {
 		flexDirection: "row",
 		marginTop: 14,
-		justifyContent: "space-between",
+		gap: 8,
 	},
 	btn: {
 		flex: 1,
-		marginHorizontal: 4,
 		paddingVertical: 12,
 		borderRadius: 14,
 		borderWidth: 1,
-		borderColor: "#DDD",
 		alignItems: "center",
 	},
-	btnText: { fontWeight: "700" },
-	btnDanger: { borderColor: "#E0523A" },
-	btnDangerText: { color: "#E0523A" },
+	btnText: { fontWeight: "700", fontSize: 14 },
 });

@@ -381,14 +381,17 @@ async function getNearbyActiveSales(lat: number, lng: number, radiusKm = 10) {
 	const { data, error } = await supabase
 		.from("garage_sales")
 		.select("*")
-		.eq("isActive", true)
+		.eq("is_active", true)
 		.not("location", "is", null);
 
 	if (error) throw error;
 
-	// filter by distance on client (you already do haversine anyway)
-	return data.filter((sale) => {
-		const km = haversineKm({ latitude: lat, longitude: lng }, sale.location);
+	return (data || []).filter((sale) => {
+		if (!sale.location?.latitude || !sale.location?.longitude) return false;
+		const km = calculateDistance(
+			{ latitude: lat, longitude: lng },
+			{ latitude: sale.location.latitude, longitude: sale.location.longitude }
+		);
 		return km <= radiusKm;
 	});
 }

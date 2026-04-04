@@ -1,4 +1,9 @@
+import LogoIcon from "@/assets/splash/logo-center.svg";
+import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { MaterialIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import {
 	KeyboardAvoidingView,
@@ -23,6 +28,8 @@ export default function ProfileAuthSheet({
 	onSwitchToSignup,
 }: Props) {
 	const { signIn } = useAuth();
+	const colorScheme = useColorScheme();
+	const theme = Colors[colorScheme ?? "light"];
 
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
@@ -49,69 +56,97 @@ export default function ProfileAuthSheet({
 					behavior={Platform.OS === "ios" ? "padding" : undefined}
 					style={styles.wrapper}
 				>
-					<View style={styles.sheet}>
+					<View
+						style={[styles.sheet, { backgroundColor: theme.background }]}
+					>
 						{/* Close */}
 						<TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-							<Text style={styles.closeText}>✕</Text>
+							<MaterialIcons name="close" size={22} color={theme.secondaryText} />
 						</TouchableOpacity>
 
 						{/* Logo */}
 						<View style={styles.logoWrap}>
-							<View style={styles.logoIcon} />
-							<Text style={styles.logoText}>Yardr</Text>
+							<LogoIcon width={52} height={52} />
+							<Text style={styles.logoText}>yardr</Text>
 						</View>
 
-						<Text style={styles.subtitle}>
+						<Text style={[styles.subtitle, { color: theme.secondaryText }]}>
 							Welcome back! Sign in to continue.
 						</Text>
 
 						{/* Form */}
 						<View style={styles.form}>
-							<Text style={styles.label}>Email</Text>
-							<View style={styles.inputWrap}>
-								<TextInput
-									placeholder="you@example.com"
-									placeholderTextColor="#9B948C"
-									value={email}
-									onChangeText={setEmail}
-									autoCapitalize="none"
-									keyboardType="email-address"
-									style={styles.input}
-								/>
-							</View>
+							<Text style={[styles.label, { color: theme.text }]}>Email</Text>
+							<TextInput
+								placeholder="you@example.com"
+								placeholderTextColor={theme.secondaryText}
+								value={email}
+								onChangeText={setEmail}
+								autoCapitalize="none"
+								keyboardType="email-address"
+								style={[
+									styles.input,
+									{
+										backgroundColor: theme.muted,
+										color: theme.text,
+										borderColor: theme.border,
+									},
+								]}
+							/>
 
-							<Text style={[styles.label, { marginTop: 16 }]}>Password</Text>
-							<View style={styles.inputWrap}>
-								<TextInput
-									placeholder="••••••••"
-									placeholderTextColor="#9B948C"
-									value={password}
-									onChangeText={setPassword}
-									secureTextEntry
-									style={styles.input}
-								/>
-							</View>
+							<Text
+								style={[styles.label, { color: theme.text, marginTop: 16 }]}
+							>
+								Password
+							</Text>
+							<TextInput
+								placeholder="Enter your password"
+								placeholderTextColor={theme.secondaryText}
+								value={password}
+								onChangeText={setPassword}
+								secureTextEntry
+								style={[
+									styles.input,
+									{
+										backgroundColor: theme.muted,
+										color: theme.text,
+										borderColor: theme.border,
+									},
+								]}
+							/>
 						</View>
 
 						{/* Sign In Button */}
 						<TouchableOpacity
-							style={[
-								styles.signInBtn,
-								(!email || !password || loading) && { opacity: 0.6 },
-							]}
 							disabled={!email || !password || loading}
 							onPress={handleLogin}
+							activeOpacity={0.9}
+							style={{ marginTop: 28 }}
 						>
-							<Text style={styles.signInText}>
-								{loading ? "Signing in…" : "Sign In"}
-							</Text>
+							<LinearGradient
+								colors={["#DF6B4F", "#F9AD85"]}
+								start={{ x: 0, y: 0.5 }}
+								end={{ x: 1, y: 0.5 }}
+								style={[
+									styles.signInBtn,
+									(!email || !password || loading) && { opacity: 0.5 },
+								]}
+							>
+								<Text style={styles.signInText}>
+									{loading ? "Signing in\u2026" : "Sign In"}
+								</Text>
+							</LinearGradient>
 						</TouchableOpacity>
 
 						{/* Footer */}
 						<View style={styles.footer}>
-							<Text style={styles.footerText}>Don’t have an account?</Text>
+							<Text style={[styles.footerText, { color: theme.secondaryText }]}>
+								Don't have an account?
+							</Text>
 							<TouchableOpacity onPress={onSwitchToSignup}>
-								<Text style={styles.footerLink}>Sign up for free</Text>
+								<Text style={[styles.footerLink, { color: theme.tint }]}>
+									Sign up for free
+								</Text>
 							</TouchableOpacity>
 						</View>
 					</View>
@@ -127,110 +162,71 @@ const styles = StyleSheet.create({
 		backgroundColor: "rgba(0,0,0,0.45)",
 		justifyContent: "flex-end",
 	},
-
-	wrapper: {
-		height: "92%",
-	},
-
+	wrapper: { height: "92%" },
 	sheet: {
 		flex: 1,
-		backgroundColor: "#FAF7F2",
 		borderTopLeftRadius: 28,
 		borderTopRightRadius: 28,
 		paddingHorizontal: 24,
 		paddingTop: 24,
 	},
-
 	closeBtn: {
 		position: "absolute",
 		top: 16,
 		right: 20,
 		zIndex: 10,
 	},
-
-	closeText: {
-		fontSize: 22,
-		color: "#7B746E",
-	},
-
 	logoWrap: {
 		alignItems: "center",
 		marginTop: 24,
 	},
-
-	logoIcon: {
-		width: 52,
-		height: 52,
-		borderRadius: 12,
-		backgroundColor: "#E28A4B",
-		marginBottom: 12,
-	},
-
 	logoText: {
 		fontSize: 30,
-		fontWeight: "800",
-		color: "#E28A4B",
+		fontWeight: "900",
+		color: "#DF6B4F",
+		marginTop: 8,
+		letterSpacing: -0.3,
 	},
-
 	subtitle: {
 		textAlign: "center",
 		fontSize: 16,
-		color: "#7B746E",
 		marginTop: 12,
 		marginBottom: 36,
 	},
-
-	form: {
-		marginTop: 12,
-	},
-
+	form: { marginTop: 12 },
 	label: {
 		fontSize: 14,
 		fontWeight: "600",
-		color: "#3A3633",
-		marginBottom: 6,
+		marginBottom: 8,
 	},
-
-	inputWrap: {
-		backgroundColor: "#F1EDE6",
-		borderRadius: 14,
-		paddingHorizontal: 14,
-		height: 52,
-		justifyContent: "center",
-	},
-
 	input: {
-		fontSize: 16,
-		color: "#1F1F1F",
+		borderWidth: 1,
+		borderRadius: 16,
+		padding: 16,
+		fontSize: 15,
 	},
-
 	signInBtn: {
-		marginTop: 32,
-		backgroundColor: "#E28A4B",
-		borderRadius: 28,
+		borderRadius: 18,
 		height: 56,
 		alignItems: "center",
 		justifyContent: "center",
+		shadowColor: "#DF6B4F",
+		shadowOffset: { width: 0, height: 6 },
+		shadowOpacity: 0.3,
+		shadowRadius: 14,
+		elevation: 4,
 	},
-
 	signInText: {
 		color: "#FFF",
 		fontSize: 18,
 		fontWeight: "700",
 	},
-
 	footer: {
 		marginTop: 28,
 		alignItems: "center",
 	},
-
-	footerText: {
-		color: "#7B746E",
-		fontSize: 14,
-	},
-
+	footerText: { fontSize: 14 },
 	footerLink: {
-		color: "#E28A4B",
 		fontSize: 15,
 		fontWeight: "700",
 		marginTop: 4,

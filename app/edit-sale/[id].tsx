@@ -1,12 +1,15 @@
+import GradientBackground from "@/components/ui/GradientBackground";
 import { garageSaleService } from "@/services/garageSaleService";
 import { GarageSale } from "@/types/garageSale";
 import { MaterialIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
 	Alert,
 	KeyboardAvoidingView,
 	Platform,
+	SafeAreaView,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -14,7 +17,6 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function EditSaleScreen() {
 	const { id } = useLocalSearchParams();
@@ -22,7 +24,6 @@ export default function EditSaleScreen() {
 	const [saving, setSaving] = useState(false);
 	const [sale, setSale] = useState<GarageSale | null>(null);
 
-	// Form state
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
 	const [address, setAddress] = useState("");
@@ -117,422 +118,254 @@ export default function EditSaleScreen() {
 
 	if (loading) {
 		return (
-			<SafeAreaView style={styles.safeArea}>
-				<View style={styles.container}>
-					<View style={styles.content}>
-						<Text style={styles.loadingText}>Loading... </Text>
-					</View>
-				</View>
+			<SafeAreaView style={styles.safe}>
+				<GradientBackground />
+				<Text style={styles.loadingText}>Loading...</Text>
 			</SafeAreaView>
 		);
 	}
 
 	return (
-		<SafeAreaView style={styles.safeArea}>
+		<SafeAreaView style={styles.safe}>
+			<GradientBackground />
 			<KeyboardAvoidingView
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
-				style={styles.container}
-				keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+				style={{ flex: 1 }}
 			>
 				{/* Header */}
 				<View style={styles.header}>
-					<TouchableOpacity
-						onPress={() => router.back()}
-						style={styles.headerButton}
-					>
-						<MaterialIcons name="arrow-back" size={24} color="#000" />
+					<TouchableOpacity onPress={() => router.back()}>
+						<Text style={styles.backChevron}>{"\u2039"}</Text>
 					</TouchableOpacity>
-					<View style={styles.headerTitleContainer}>
-						<Text style={styles.headerTitle}>Edit Sale</Text>
-					</View>
-					<TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
-						<MaterialIcons name="delete" size={24} color="#FF3B30" />
+					<Text style={styles.headerTitle}>Edit Sale</Text>
+					<TouchableOpacity onPress={handleDelete}>
+						<MaterialIcons name="delete-outline" size={24} color="#E05244" />
 					</TouchableOpacity>
 				</View>
 
 				<ScrollView
-					style={styles.scrollView}
-					contentContainerStyle={styles.scrollContent}
-					showsVerticalScrollIndicator={true}
+					contentContainerStyle={styles.content}
+					showsVerticalScrollIndicator={false}
 					keyboardShouldPersistTaps="handled"
 				>
-					<View style={styles.content}>
-						{/* Sale Details Section */}
-						<View style={styles.section}>
-							<Text style={styles.sectionTitle}>Sale Details</Text>
-							<View style={styles.card}>
-								<View style={styles.fieldGroup}>
-									<Text style={styles.label}>Title *</Text>
-									<TextInput
-										style={styles.input}
-										placeholder="Multi-Family Garage Sale"
-										placeholderTextColor="#999"
-										value={title}
-										onChangeText={setTitle}
-										editable={!saving}
-									/>
-								</View>
+					{/* Sale Details */}
+					<Text style={styles.sectionTitle}>Sale Details</Text>
 
-								<View style={styles.fieldGroup}>
-									<Text style={styles.label}>Description *</Text>
-									<TextInput
-										style={[styles.input, styles.textArea]}
-										placeholder="Furniture, electronics, books, and household items"
-										placeholderTextColor="#999"
-										value={description}
-										onChangeText={setDescription}
-										multiline
-										numberOfLines={4}
-										editable={!saving}
-									/>
-								</View>
+					<Text style={styles.label}>Title *</Text>
+					<TextInput
+						style={styles.glassInput}
+						value={title}
+						onChangeText={setTitle}
+						placeholder="Sale title"
+						placeholderTextColor="#807A73"
+						editable={!saving}
+					/>
 
-								<View style={styles.fieldGroup}>
-									<Text style={styles.label}>Address *</Text>
-									<View style={styles.inputWithIcon}>
-										<MaterialIcons
-											name="location-on"
-											size={20}
-											color="#FF9500"
-										/>
-										<TextInput
-											style={[styles.input, styles.inputWithIconText]}
-											placeholder="1234 Oak Street, Maplewood"
-											placeholderTextColor="#999"
-											value={address}
-											editable={false}
-										/>
-									</View>
-									<Text style={styles.infoText}>
-										Address cannot be changed after creation
-									</Text>
-								</View>
-							</View>
+					<Text style={styles.label}>Description *</Text>
+					<TextInput
+						style={[styles.glassInput, styles.textArea]}
+						value={description}
+						onChangeText={setDescription}
+						placeholder="What are you selling?"
+						placeholderTextColor="#807A73"
+						multiline
+						editable={!saving}
+					/>
+
+					<Text style={styles.label}>Address</Text>
+					<TextInput
+						style={[styles.glassInput, styles.disabledInput]}
+						value={address}
+						editable={false}
+					/>
+					<Text style={styles.hint}>Cannot be changed after creation</Text>
+
+					{/* Schedule */}
+					<Text style={[styles.sectionTitle, { marginTop: 20 }]}>
+						Schedule
+					</Text>
+
+					<View style={styles.row}>
+						<View style={{ flex: 1 }}>
+							<Text style={styles.label}>Date</Text>
+							<TextInput
+								style={[styles.glassInput, styles.disabledInput]}
+								value={date}
+								editable={false}
+							/>
 						</View>
-
-						{/* Schedule Section */}
-						<View style={styles.section}>
-							<View style={styles.scheduleHeader}>
-								<MaterialIcons
-									name="calendar-today"
-									size={20}
-									color="#FF9500"
-								/>
-								<Text style={styles.sectionTitle}>Schedule</Text>
-							</View>
-							<View style={styles.card}>
-								<View style={styles.fieldGroup}>
-									<Text style={styles.label}>Date *</Text>
-									<View style={styles.inputWithIcon}>
-										<MaterialIcons name="event" size={20} color="#FF9500" />
-										<TextInput
-											style={[styles.input, styles.inputWithIconText]}
-											placeholder="2024-12-21"
-											placeholderTextColor="#999"
-											value={date}
-											editable={false}
-										/>
-									</View>
-									<Text style={styles.infoText}>
-										Date cannot be changed after creation
-									</Text>
-								</View>
-
-								<View style={styles.timeRow}>
-									<View style={[styles.fieldGroup, styles.timeField]}>
-										<Text style={styles.label}>Start Time</Text>
-										<View style={styles.inputWithIcon}>
-											<MaterialIcons
-												name="schedule"
-												size={20}
-												color="#FF9500"
-											/>
-											<TextInput
-												style={[styles.input, styles.inputWithIconText]}
-												placeholder="08:00 AM"
-												placeholderTextColor="#999"
-												value={startTime}
-												editable={false}
-											/>
-										</View>
-									</View>
-
-									<View style={[styles.fieldGroup, styles.timeField]}>
-										<Text style={styles.label}>End Time</Text>
-										<View style={styles.inputWithIcon}>
-											<MaterialIcons
-												name="schedule"
-												size={20}
-												color="#FF9500"
-											/>
-											<TextInput
-												style={[styles.input, styles.inputWithIconText]}
-												placeholder="02:00 PM"
-												placeholderTextColor="#999"
-												value={endTime}
-												editable={false}
-											/>
-										</View>
-									</View>
-								</View>
-							</View>
-						</View>
-
-						{/* Contact Information Section */}
-						<View style={styles.section}>
-							<Text style={styles.sectionTitle}>Contact Information</Text>
-							<View style={styles.card}>
-								<View style={styles.fieldGroup}>
-									<Text style={styles.label}>Contact Name *</Text>
-									<TextInput
-										style={styles.input}
-										placeholder="Seller"
-										placeholderTextColor="#999"
-										value={contactName}
-										onChangeText={setContactName}
-										editable={!saving}
-									/>
-								</View>
-
-								<View style={styles.fieldGroup}>
-									<Text style={styles.label}>Phone Number</Text>
-									<View style={styles.inputWithIcon}>
-										<MaterialIcons name="phone" size={20} color="#FF9500" />
-										<TextInput
-											style={[styles.input, styles.inputWithIconText]}
-											placeholder="(555) 123-4567"
-											placeholderTextColor="#999"
-											value={contactPhone}
-											onChangeText={setContactPhone}
-											keyboardType="phone-pad"
-											editable={!saving}
-										/>
-									</View>
-								</View>
-
-								<View style={styles.fieldGroup}>
-									<Text style={styles.label}>Email</Text>
-									<View style={styles.inputWithIcon}>
-										<MaterialIcons name="email" size={20} color="#FF9500" />
-										<TextInput
-											style={[styles.input, styles.inputWithIconText]}
-											placeholder="your@email.com"
-											placeholderTextColor="#999"
-											value={contactEmail}
-											onChangeText={setContactEmail}
-											keyboardType="email-address"
-											autoCapitalize="none"
-											editable={!saving}
-										/>
-									</View>
-								</View>
-							</View>
-						</View>
-
-						<Text style={styles.note}>
-							Note: Date, time, location, and categories cannot be changed after
-							creation.
-						</Text>
 					</View>
-				</ScrollView>
 
-				{/* Save Button - Fixed at bottom */}
-				<SafeAreaView style={styles.buttonContainer} edges={["bottom"]}>
+					<View style={styles.row}>
+						<View style={{ flex: 1 }}>
+							<Text style={styles.label}>Start</Text>
+							<TextInput
+								style={[styles.glassInput, styles.disabledInput]}
+								value={startTime}
+								editable={false}
+							/>
+						</View>
+						<View style={{ flex: 1 }}>
+							<Text style={styles.label}>End</Text>
+							<TextInput
+								style={[styles.glassInput, styles.disabledInput]}
+								value={endTime}
+								editable={false}
+							/>
+						</View>
+					</View>
+
+					{/* Contact */}
+					<Text style={[styles.sectionTitle, { marginTop: 20 }]}>
+						Contact Info
+					</Text>
+
+					<Text style={styles.label}>Name *</Text>
+					<TextInput
+						style={styles.glassInput}
+						value={contactName}
+						onChangeText={setContactName}
+						placeholder="Your name"
+						placeholderTextColor="#807A73"
+						editable={!saving}
+					/>
+
+					<Text style={styles.label}>Phone</Text>
+					<TextInput
+						style={styles.glassInput}
+						value={contactPhone}
+						onChangeText={setContactPhone}
+						placeholder="(555) 123-4567"
+						placeholderTextColor="#807A73"
+						keyboardType="phone-pad"
+						editable={!saving}
+					/>
+
+					<Text style={styles.label}>Email</Text>
+					<TextInput
+						style={styles.glassInput}
+						value={contactEmail}
+						onChangeText={setContactEmail}
+						placeholder="your@email.com"
+						placeholderTextColor="#807A73"
+						keyboardType="email-address"
+						autoCapitalize="none"
+						editable={!saving}
+					/>
+
+					{/* Save Button */}
 					<TouchableOpacity
-						style={[styles.saveButton, saving && styles.buttonDisabled]}
 						onPress={handleSave}
 						disabled={saving}
-						activeOpacity={0.8}
+						activeOpacity={0.9}
+						style={{ marginTop: 24 }}
 					>
-						<MaterialIcons
-							name="check"
-							size={20}
-							color="#fff"
-							style={styles.saveButtonIcon}
-						/>
-						<Text style={styles.saveButtonText}>
-							{saving ? "Saving..." : "Save Changes"}
-						</Text>
+						<LinearGradient
+							colors={["#DF6B4F", "#F9AD85"]}
+							start={{ x: 0, y: 0.5 }}
+							end={{ x: 1, y: 0.5 }}
+							style={[styles.saveBtn, saving && { opacity: 0.5 }]}
+						>
+							<Text style={styles.saveBtnText}>
+								{saving ? "Saving..." : "Save Changes"}
+							</Text>
+						</LinearGradient>
 					</TouchableOpacity>
-				</SafeAreaView>
+
+					<View style={{ height: 40 }} />
+				</ScrollView>
 			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 }
 
 const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: "#f8f8f8",
-	},
-	container: {
-		flex: 1,
-		backgroundColor: "#f8f8f8",
-	},
+	safe: { flex: 1, backgroundColor: "#F7F6F4" },
+
 	header: {
 		flexDirection: "row",
 		alignItems: "center",
-		justifyContent: "space-between",
 		paddingHorizontal: 16,
-		paddingVertical: 12,
-		backgroundColor: "#fff",
-		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
+		paddingVertical: 8,
 	},
-	headerButton: {
-		width: 40,
-		height: 40,
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	headerTitleContainer: {
-		flex: 1,
-		alignItems: "center",
-		justifyContent: "center",
+	backChevron: {
+		fontSize: 28,
+		fontWeight: "700",
+		color: "#23201C",
 	},
 	headerTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#000",
-	},
-	scrollView: {
 		flex: 1,
+		textAlign: "center",
+		fontSize: 18,
+		fontWeight: "700",
+		color: "#23201C",
 	},
-	scrollContent: {
-		flexGrow: 1,
-		paddingBottom: 100,
-	},
+
 	content: {
-		padding: 16,
+		paddingHorizontal: 20,
+		paddingTop: 8,
 	},
 	loadingText: {
 		textAlign: "center",
 		marginTop: 50,
 		fontSize: 16,
-		color: "#666",
+		color: "#807A73",
 	},
 
-	// Section styles
-	section: {
-		marginBottom: 24,
-	},
 	sectionTitle: {
 		fontSize: 16,
-		fontWeight: "700",
-		color: "#000",
+		fontWeight: "800",
+		color: "#23201C",
 		marginBottom: 12,
-	},
-	scheduleHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 8,
-		marginBottom: 12,
-	},
-	card: {
-		backgroundColor: "#fff",
-		borderRadius: 12,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: "#f0f0f0",
-	},
-
-	// Field styles
-	fieldGroup: {
-		marginBottom: 16,
 	},
 	label: {
 		fontSize: 14,
 		fontWeight: "600",
+		color: "#23201C",
 		marginBottom: 8,
-		color: "#333",
+		marginTop: 12,
 	},
-	input: {
+	glassInput: {
+		backgroundColor: "rgba(255,255,255,0.5)",
 		borderWidth: 1,
-		borderColor: "#e0e0e0",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 12,
-		fontSize: 16,
-		backgroundColor: "#fafafa",
-		color: "#000",
+		borderColor: "rgba(255,255,255,0.3)",
+		borderRadius: 16,
+		paddingHorizontal: 16,
+		paddingVertical: 14,
+		fontSize: 15,
+		color: "#23201C",
 	},
 	textArea: {
-		height: 100,
+		minHeight: 90,
 		textAlignVertical: "top",
-		paddingTop: 12,
 	},
-	inputWithIcon: {
-		flexDirection: "row",
-		alignItems: "center",
-		borderWidth: 1,
-		borderColor: "#e0e0e0",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		backgroundColor: "#fafafa",
+	disabledInput: {
+		opacity: 0.6,
 	},
-	inputWithIconText: {
-		flex: 1,
-		marginLeft: 8,
-		borderWidth: 0,
-		backgroundColor: "transparent",
-	},
-
-	// Time row
-	timeRow: {
-		flexDirection: "row",
-		gap: 10,
-	},
-	timeField: {
-		flex: 1,
-	},
-
-	// Info text
-	infoText: {
+	hint: {
 		fontSize: 12,
-		color: "#999",
-		marginTop: 6,
+		color: "#807A73",
+		marginTop: 4,
 		fontStyle: "italic",
 	},
-	note: {
-		fontSize: 13,
-		color: "#666",
-		fontStyle: "italic",
-		marginTop: 20,
-		marginBottom: 20,
-		paddingHorizontal: 4,
+	row: {
+		flexDirection: "row",
+		gap: 12,
 	},
 
-	// Button styles
-	buttonContainer: {
-		backgroundColor: "#f8f8f8",
-		paddingTop: 12,
-		paddingHorizontal: 16,
-		paddingBottom: 16,
-		borderTopWidth: 1,
-		borderTopColor: "#e0e0e0",
-	},
-	saveButton: {
-		backgroundColor: "#FF9500",
+	saveBtn: {
+		borderRadius: 18,
 		paddingVertical: 16,
-		borderRadius: 12,
-		flexDirection: "row",
 		alignItems: "center",
-		justifyContent: "center",
-		elevation: 4,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.15,
-		shadowRadius: 4,
+		shadowColor: "#DF6B4F",
+		shadowOffset: { width: 0, height: 6 },
+		shadowOpacity: 0.3,
+		shadowRadius: 18,
+		elevation: 6,
 	},
-	saveButtonIcon: {
-		marginRight: 8,
-	},
-	saveButtonText: {
+	saveBtnText: {
 		color: "#fff",
 		fontSize: 16,
 		fontWeight: "700",
-	},
-	buttonDisabled: {
-		opacity: 0.6,
 	},
 });

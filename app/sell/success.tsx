@@ -1,4 +1,4 @@
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -8,7 +8,7 @@ export default function SellSuccess() {
 		<View style={styles.safe}>
 			<View style={styles.card}>
 				<View style={styles.iconWrap}>
-					<IconSymbol size={28} name="checkmark.circle.fill" color="#2E7D32" />
+					<MaterialIcons name="check-circle" size={28} color="#2E7D32" />
 				</View>
 
 				<Text style={styles.title}>Your sale is live</Text>
@@ -40,7 +40,7 @@ export default function SellSuccess() {
 const styles = StyleSheet.create({
 	safe: {
 		flex: 1,
-		backgroundColor: "#FAF7F2",
+		backgroundColor: "#F7F6F4",
 		alignItems: "center",
 		justifyContent: "center",
 		paddingHorizontal: 18,
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
 		marginTop: 18,
 		height: 56,
 		borderRadius: 28,
-		backgroundColor: "#D97B3F",
+		backgroundColor: "#DF6B4F",
 		alignItems: "center",
 		justifyContent: "center",
 	},

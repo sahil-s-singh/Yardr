@@ -11,9 +11,12 @@
     "ios": {
       "supportsTablet": true,
       "config": {
-        "googleMapsApiKey": "YOUR_IOS_GOOGLE_MAPS_API_KEY"
+        "googleMapsApiKey": "AIzaSyDsktqpJ0iWDwPc56QSIMTVapNKqt9v1ag"
       },
-      "bundleIdentifier": "com.gauravyxe.yardr"
+      "bundleIdentifier": "com.sahil.yardr",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -42,7 +45,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#FFF5ED",
           "dark": {
             "backgroundColor": "#000000"
           }
@@ -52,6 +55,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f9805b98-5747-42cd-bc89-11e9a70bbd08"
+      }
     }
   }
 }

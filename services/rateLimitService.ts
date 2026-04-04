@@ -30,6 +30,35 @@ async function getDeviceId(): Promise<string> {
 	}
 }
 
+async function checkRateLimit(): Promise<{
+	allowed: boolean;
+	message?: string;
+}> {
+	// Simple client-side rate limit: max 5 posts per day
+	try {
+		const key = "yardr_post_timestamps";
+		const raw = await AsyncStorage.getItem(key);
+		const timestamps: number[] = raw ? JSON.parse(raw) : [];
+
+		const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+		const recent = timestamps.filter((t) => t > oneDayAgo);
+
+		if (recent.length >= 5) {
+			return {
+				allowed: false,
+				message: "You can only post 5 sales per day. Please try again later.",
+			};
+		}
+
+		recent.push(Date.now());
+		await AsyncStorage.setItem(key, JSON.stringify(recent));
+		return { allowed: true };
+	} catch {
+		return { allowed: true };
+	}
+}
+
 export const rateLimitService = {
 	getDeviceId,
+	checkRateLimit,
 };

@@ -1,14 +1,18 @@
 // app/tabs/profile.tsx
 
+import GradientBackground from "@/components/ui/GradientBackground";
 import ProfileAuthSheet from "@/components/profile/ProfileAuthSheet";
-import ProfileMenuSheet from "@/components/profile/ProfileMenuSheet";
 import ProfileSignupSheet from "@/components/profile/ProfileSignupSheet";
+import { Accent, Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { getMySales } from "@/services/garageSaleService";
+import { MaterialIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
 	Alert,
+	SafeAreaView,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -22,17 +26,29 @@ const showComingSoon = (feature: string) => {
 	]);
 };
 
+type MenuItemType = {
+	label: string;
+	icon: keyof typeof MaterialIcons.glyphMap;
+	route: string | null;
+};
+
+const menuItems: MenuItemType[] = [
+	{ label: "My Sales", icon: "grid-view", route: "/my-sales" },
+	{ label: "Saved Sales", icon: "favorite-border", route: null },
+	{ label: "Notifications", icon: "notifications-none", route: null },
+	{ label: "Settings", icon: "settings", route: null },
+	{ label: "Help & Support", icon: "help-outline", route: null },
+];
+
 export default function ProfileScreen() {
 	const { user, signOut } = useAuth();
+	const colorScheme = useColorScheme();
+	const theme = Colors[colorScheme ?? "light"];
 
 	const [showLogin, setShowLogin] = useState(false);
 	const [showSignup, setShowSignup] = useState(false);
-	const [showMenu, setShowMenu] = useState(false);
 	const [salesCount, setSalesCount] = useState(0);
 
-	// Load sales count when screen comes into focus
-	// This ensures the count updates after creating/deleting sales
-	// and uses the same source of truth as My Sales screen
 	useFocusEffect(
 		useCallback(() => {
 			if (user) {
@@ -50,30 +66,37 @@ export default function ProfileScreen() {
 		}, [user])
 	);
 
-	// ---------------------------
-	// LOGGED OUT VIEW
-	// ---------------------------
+	// LOGGED OUT
 	if (!user) {
 		return (
 			<>
-				<View style={styles.container}>
-					<Text style={styles.title}>Profile</Text>
+				<SafeAreaView
+					style={[styles.safe, { backgroundColor: theme.background }]}
+				>
+					<GradientBackground />
+					<View style={styles.container}>
+						<View style={styles.centerBox}>
+							<View
+								style={[styles.avatar, { backgroundColor: theme.muted }]}
+							>
+								<MaterialIcons name="person" size={40} color={theme.secondaryText} />
+							</View>
+							<Text style={[styles.heading, { color: theme.text }]}>
+								Sign in to yardr
+							</Text>
+							<Text style={[styles.sub, { color: theme.secondaryText }]}>
+								Create and manage your sales, save favorites, and more.
+							</Text>
 
-					<View style={styles.centerBox}>
-						<View style={styles.avatar} />
-						<Text style={styles.heading}>Sign in to Yardr</Text>
-						<Text style={styles.sub}>
-							Create and manage your sales, save favorites, and more.
-						</Text>
-
-						<TouchableOpacity
-							style={styles.primaryBtn}
-							onPress={() => setShowLogin(true)}
-						>
-							<Text style={styles.primaryText}>Sign In or Sign Up</Text>
-						</TouchableOpacity>
+							<TouchableOpacity
+								style={[styles.primaryBtn, { backgroundColor: theme.tint }]}
+								onPress={() => setShowLogin(true)}
+							>
+								<Text style={styles.primaryText}>Sign In or Sign Up</Text>
+							</TouchableOpacity>
+						</View>
 					</View>
-				</View>
+				</SafeAreaView>
 
 				<ProfileAuthSheet
 					visible={showLogin}
@@ -83,7 +106,6 @@ export default function ProfileScreen() {
 						setShowSignup(true);
 					}}
 				/>
-
 				<ProfileSignupSheet
 					visible={showSignup}
 					onClose={() => setShowSignup(false)}
@@ -96,137 +118,188 @@ export default function ProfileScreen() {
 		);
 	}
 
-	// ---------------------------
-	// LOGGED IN VIEW
-	// ---------------------------
+	// LOGGED IN
+	const stats = [
+		{ label: "Sales", value: String(salesCount), icon: "style" as const, color: theme.tint },
+		{ label: "Saved", value: "12", icon: "favorite" as const, color: Accent.sage },
+		{ label: "Visits", value: "28", icon: "visibility" as const, color: Accent.indigo },
+	];
+
 	return (
-		<>
-			<ScrollView style={styles.container}>
-				<Text style={styles.title}>Profile</Text>
-
-				<View style={styles.card}>
-					<View style={styles.avatarLarge} />
-					<Text style={styles.name}>Demo User</Text>
-					<Text style={styles.email}>{user.email}</Text>
+		<SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+			<GradientBackground />
+			<ScrollView
+				style={styles.container}
+				contentContainerStyle={{ paddingBottom: 120 }}
+			>
+				{/* Profile Card */}
+				<View style={[styles.card, { backgroundColor: theme.card }]}>
+					<View
+						style={[styles.avatarLarge, { backgroundColor: theme.muted }]}
+					>
+						<MaterialIcons name="person" size={36} color={theme.secondaryText} />
+					</View>
+					<Text style={[styles.name, { color: theme.text }]}>
+						{user.user_metadata?.display_name || "User"}
+					</Text>
+					<Text style={[styles.email, { color: theme.secondaryText }]}>
+						{user.email}
+					</Text>
 				</View>
 
+				{/* Stats Row */}
 				<View style={styles.stats}>
-					<Stat label="Sales" value={String(salesCount)} />
-					<Stat label="Saved" value="0" />
-					<Stat label="Visits" value="0" />
+					{stats.map((s) => (
+						<View
+							key={s.label}
+							style={[styles.stat, { backgroundColor: theme.card }]}
+						>
+							<MaterialIcons name={s.icon} size={20} color={s.color} />
+							<Text style={[styles.statValue, { color: s.color }]}>
+								{s.value}
+							</Text>
+							<Text style={[styles.statLabel, { color: theme.secondaryText }]}>
+								{s.label}
+							</Text>
+						</View>
+					))}
 				</View>
 
-				<MenuItem label="My Sales" onPress={() => router.push("/my-sales")} />
-				<MenuItem
-					label="Saved Sales"
-					onPress={() => showComingSoon("Saved Sales")}
-				/>
-				<MenuItem
-					label="Notifications"
-					onPress={() => showComingSoon("Notifications")}
-				/>
-				<MenuItem label="Settings" onPress={() => showComingSoon("Settings")} />
-				<MenuItem
-					label="Help & Support"
-					onPress={() => showComingSoon("Help & Support")}
-				/>
+				{/* Menu Card */}
+				<View style={[styles.menuCard, { backgroundColor: theme.card }]}>
+					{menuItems.map((item, i) => (
+						<View key={item.label}>
+							<TouchableOpacity
+								style={styles.menuItem}
+								onPress={() =>
+									item.route
+										? router.push(item.route as any)
+										: showComingSoon(item.label)
+								}
+							>
+								<MaterialIcons
+									name={item.icon}
+									size={22}
+									color={theme.secondaryText}
+								/>
+								<Text
+									style={[
+										styles.menuText,
+										{ color: theme.text, flex: 1 },
+									]}
+								>
+									{item.label}
+								</Text>
+								<MaterialIcons
+									name="chevron-right"
+									size={20}
+									color={theme.secondaryText}
+								/>
+							</TouchableOpacity>
+							{i < menuItems.length - 1 && (
+								<View
+									style={[
+										styles.menuDivider,
+										{ backgroundColor: theme.border },
+									]}
+								/>
+							)}
+						</View>
+					))}
+				</View>
 
-				<TouchableOpacity style={styles.logout} onPress={signOut}>
-					<Text style={styles.logoutText}>Sign Out</Text>
+				{/* Sign Out */}
+				<TouchableOpacity
+					style={[
+						styles.logout,
+						{
+							backgroundColor: `${theme.tint}14`,
+							borderColor: `${theme.tint}33`,
+						},
+					]}
+					onPress={signOut}
+				>
+					<Text style={[styles.logoutText, { color: theme.tint }]}>
+						Sign Out
+					</Text>
 				</TouchableOpacity>
 			</ScrollView>
-
-			<ProfileMenuSheet visible={showMenu} onClose={() => setShowMenu(false)} />
-		</>
-	);
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-	return (
-		<View style={styles.stat}>
-			<Text style={styles.statValue}>{value}</Text>
-			<Text style={styles.statLabel}>{label}</Text>
-		</View>
-	);
-}
-
-function MenuItem({ label, onPress }: { label: string; onPress: () => void }) {
-	return (
-		<TouchableOpacity style={styles.menuItem} onPress={onPress}>
-			<Text style={styles.menuText}>{label}</Text>
-			<Text style={styles.arrow}>›</Text>
-		</TouchableOpacity>
+		</SafeAreaView>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: "#FAF7F2", padding: 20 },
-	title: { fontSize: 28, fontWeight: "800", marginBottom: 20 },
+	safe: { flex: 1 },
+	container: { flex: 1, padding: 20 },
 
 	centerBox: { alignItems: "center", marginTop: 80 },
-	avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: "#EEE" },
+	avatar: {
+		width: 90,
+		height: 90,
+		borderRadius: 45,
+		alignItems: "center",
+		justifyContent: "center",
+	},
 	heading: { fontSize: 22, fontWeight: "700", marginTop: 20 },
-	sub: { textAlign: "center", color: "#777", marginTop: 10 },
+	sub: { textAlign: "center", marginTop: 10, lineHeight: 22 },
 
 	primaryBtn: {
-		backgroundColor: "#D97B3F",
 		paddingHorizontal: 28,
 		paddingVertical: 16,
-		borderRadius: 30,
+		borderRadius: 18,
 		marginTop: 30,
 	},
 	primaryText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 
 	card: {
-		backgroundColor: "#fff",
-		borderRadius: 20,
-		padding: 20,
+		borderRadius: 22,
+		padding: 24,
 		alignItems: "center",
-		marginBottom: 20,
+		marginBottom: 16,
 	},
 	avatarLarge: {
-		width: 80,
-		height: 80,
-		borderRadius: 40,
-		backgroundColor: "#F2E6DA",
+		width: 72,
+		height: 72,
+		borderRadius: 36,
+		alignItems: "center",
+		justifyContent: "center",
 	},
 	name: { fontSize: 20, fontWeight: "700", marginTop: 10 },
-	email: { color: "#777", marginTop: 4 },
+	email: { marginTop: 4, fontSize: 14 },
 
 	stats: {
 		flexDirection: "row",
-		justifyContent: "space-between",
-		marginBottom: 20,
+		gap: 12,
+		marginBottom: 16,
 	},
 	stat: {
 		flex: 1,
-		backgroundColor: "#fff",
-		marginHorizontal: 4,
-		borderRadius: 16,
+		borderRadius: 18,
 		padding: 16,
 		alignItems: "center",
 	},
-	statValue: { fontSize: 20, fontWeight: "800" },
-	statLabel: { color: "#777", marginTop: 4 },
+	statValue: { fontSize: 22, fontWeight: "900", marginTop: 4 },
+	statLabel: { marginTop: 4, fontSize: 12, fontWeight: "600" },
 
+	menuCard: {
+		borderRadius: 22,
+		overflow: "hidden",
+		marginBottom: 16,
+	},
 	menuItem: {
-		backgroundColor: "#fff",
-		padding: 18,
-		borderRadius: 16,
-		marginBottom: 10,
+		padding: 16,
 		flexDirection: "row",
-		justifyContent: "space-between",
+		alignItems: "center",
+		gap: 14,
 	},
 	menuText: { fontSize: 16, fontWeight: "600" },
-	arrow: { fontSize: 20, color: "#999" },
+	menuDivider: { height: 1, marginHorizontal: 16 },
 
 	logout: {
-		marginTop: 20,
 		padding: 16,
-		borderRadius: 30,
+		borderRadius: 18,
 		borderWidth: 1,
-		borderColor: "#F3B0A5",
 		alignItems: "center",
 	},
-	logoutText: { color: "#E0523A", fontWeight: "700" },
+	logoutText: { fontWeight: "700", fontSize: 16 },
 });

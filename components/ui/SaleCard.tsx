@@ -1,17 +1,16 @@
 import React, { useMemo } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { GarageSale } from "@/types/garageSale";
 
 function formatDateBadge(iso: string) {
-	const d = new Date(iso);
-	const weekday = d.toLocaleDateString("en-US", { weekday: "short" });
+	const d = new Date(iso + "T00:00:00");
 	const month = d.toLocaleDateString("en-US", { month: "short" });
 	const day = d.getDate();
-	return `${weekday}, ${month} ${day}`;
+	return `${month} ${day}`;
 }
 
 function formatTimeRange(startTime?: string, endTime?: string) {
@@ -22,7 +21,7 @@ function formatTimeRange(startTime?: string, endTime?: string) {
 		const h = ((hh + 11) % 12) + 1;
 		return `${h}${mm ? `:${String(mm).padStart(2, "0")}` : ""}${ampm}`;
 	};
-	return `${to12(startTime)} - ${to12(endTime)}`;
+	return `${to12(startTime)} \u2013 ${to12(endTime)}`;
 }
 
 export default function SaleCard({
@@ -46,17 +45,10 @@ export default function SaleCard({
 		[sale.startTime, sale.endTime]
 	);
 
-	const CardComponent = onPress ? TouchableOpacity : View;
+	const itemCount = (sale.categories?.length ?? 0) || 4;
 
-	return (
-		<CardComponent
-			style={[
-				styles.card,
-				{ backgroundColor: theme.card, borderColor: theme.border },
-			]}
-			onPress={onPress}
-			activeOpacity={onPress ? 0.95 : 1}
-		>
+	const content = (
+		<>
 			<View style={styles.mediaWrap}>
 				{img ? (
 					<Image
@@ -68,28 +60,17 @@ export default function SaleCard({
 					<View
 						style={[styles.mediaPlaceholder, { backgroundColor: theme.muted }]}
 					>
-						<IconSymbol size={30} name="photo" color={theme.secondaryText} />
+						<MaterialIcons name="photo" size={28} color={theme.secondaryText} />
 					</View>
 				)}
 
-				<View
-					style={[
-						styles.distancePill,
-						{ backgroundColor: theme.card, borderColor: theme.border },
-					]}
-				>
-					<IconSymbol
-						size={16}
-						name="location.fill"
-						color={theme.secondaryText}
-					/>
-					<Text style={[styles.distanceText, { color: theme.text }]}>
-						{distanceText || ""}
-					</Text>
-				</View>
+				{distanceText ? (
+					<View style={styles.distancePill}>
+						<Text style={styles.distanceText}>{distanceText}</Text>
+					</View>
+				) : null}
 
 				<View style={[styles.dateBadge, { backgroundColor: theme.tint }]}>
-					<IconSymbol size={16} name="calendar" color="#FFFFFF" />
 					<Text style={styles.dateText}>{badgeText}</Text>
 				</View>
 			</View>
@@ -99,53 +80,59 @@ export default function SaleCard({
 					{sale.title}
 				</Text>
 
-				<View style={styles.timeRow}>
-					<IconSymbol size={16} name="clock" color={theme.secondaryText} />
-					<Text style={[styles.timeText, { color: theme.secondaryText }]}>
-						{timeText}
-					</Text>
-				</View>
+				<Text style={[styles.timeText, { color: theme.secondaryText }]}>
+					{timeText}
+				</Text>
 
 				<View style={[styles.divider, { backgroundColor: theme.border }]} />
 
 				<View style={styles.itemsRow}>
-					<View style={styles.avatarStack}>
-						<View style={[styles.avatar, { backgroundColor: theme.muted }]} />
-						<View
-							style={[
-								styles.avatar,
-								{ backgroundColor: theme.muted, marginLeft: -10 },
-							]}
-						/>
-						<View
-							style={[
-								styles.avatar,
-								{ backgroundColor: theme.muted, marginLeft: -10 },
-							]}
-						/>
+					<View
+						style={[styles.countBadge, { backgroundColor: `${theme.tint}18` }]}
+					>
+						<Text style={[styles.countText, { color: theme.tint }]}>
+							{itemCount}
+						</Text>
 					</View>
 					<Text style={[styles.itemsText, { color: theme.secondaryText }]}>
-						{(sale.categories?.length ?? 0) || 4} items
+						items for sale
 					</Text>
 				</View>
 			</View>
-		</CardComponent>
+		</>
+	);
+
+	if (onPress) {
+		return (
+			<TouchableOpacity
+				style={[styles.card, { backgroundColor: theme.card }]}
+				onPress={onPress}
+				activeOpacity={0.95}
+			>
+				{content}
+			</TouchableOpacity>
+		);
+	}
+
+	return (
+		<View style={[styles.card, { backgroundColor: theme.card }]}>
+			{content}
+		</View>
 	);
 }
 
 const styles = StyleSheet.create({
 	card: {
-		borderWidth: 1,
-		borderRadius: 18,
+		borderRadius: 22,
 		overflow: "hidden",
 		marginBottom: 16,
 		shadowColor: "#000",
-		shadowOpacity: 0.08,
-		shadowRadius: 18,
-		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.06,
+		shadowRadius: 20,
+		shadowOffset: { width: 0, height: 4 },
 		elevation: 3,
 	},
-	mediaWrap: { height: 230, width: "100%" },
+	mediaWrap: { height: 180, width: "100%" },
 	media: { width: "100%", height: "100%" },
 	mediaPlaceholder: {
 		width: "100%",
@@ -156,57 +143,43 @@ const styles = StyleSheet.create({
 
 	distancePill: {
 		position: "absolute",
-		top: 14,
-		right: 14,
-		borderWidth: 1,
+		top: 12,
+		right: 12,
+		backgroundColor: "rgba(255,255,255,0.85)",
 		borderRadius: 999,
-		paddingVertical: 8,
-		paddingHorizontal: 12,
-		flexDirection: "row",
-		gap: 8,
-		alignItems: "center",
+		paddingVertical: 5,
+		paddingHorizontal: 10,
 	},
-	distanceText: { fontSize: 15, fontWeight: "800" },
+	distanceText: { fontSize: 12, fontWeight: "700", color: "#23201C" },
 
 	dateBadge: {
 		position: "absolute",
-		left: 14,
-		bottom: 14,
-		borderRadius: 999,
-		paddingVertical: 10,
-		paddingHorizontal: 14,
-		flexDirection: "row",
-		gap: 10,
-		alignItems: "center",
+		left: 12,
+		bottom: 12,
+		borderRadius: 10,
+		paddingVertical: 5,
+		paddingHorizontal: 10,
 	},
-	dateText: { color: "#fff", fontSize: 16, fontWeight: "800" },
+	dateText: { color: "#fff", fontSize: 12, fontWeight: "700" },
 
 	body: { padding: 16 },
 	title: {
-		fontSize: 22,
-		fontWeight: "900",
-		letterSpacing: -0.3,
-		marginBottom: 10,
+		fontSize: 18,
+		fontWeight: "700",
+		letterSpacing: -0.2,
+		marginBottom: 6,
 	},
 
-	timeRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 10,
-		marginBottom: 10,
-	},
-	timeText: { fontSize: 16, fontWeight: "700" },
+	timeText: { fontSize: 14, fontWeight: "600", marginBottom: 10 },
 
-	divider: { height: 1, width: "100%", marginVertical: 12 },
+	divider: { height: 1, width: "100%", marginBottom: 10 },
 
-	itemsRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-	avatarStack: { flexDirection: "row", alignItems: "center" },
-	avatar: {
-		width: 26,
-		height: 26,
-		borderRadius: 999,
-		borderWidth: 2,
-		borderColor: "#fff",
+	itemsRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+	countBadge: {
+		borderRadius: 6,
+		paddingVertical: 2,
+		paddingHorizontal: 8,
 	},
-	itemsText: { fontSize: 16, fontWeight: "700" },
+	countText: { fontSize: 14, fontWeight: "800" },
+	itemsText: { fontSize: 14, fontWeight: "600" },
 });

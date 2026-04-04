@@ -10,19 +10,20 @@ import {
 	SafeAreaView,
 	StyleSheet,
 	Text,
-	TouchableOpacity,
 	View,
 } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT, Region } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
 
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { garageSaleService } from "@/services/garageSaleService";
 import { GarageSale } from "@/types/garageSale";
 
+import GradientBackground from "@/components/ui/GradientBackground";
 import HeaderBar from "@/components/ui/HeaderBar";
 import SaleCard from "@/components/ui/SaleCard";
-import SegmentedControl from "@/components/ui/SegmentedControl";
+import StoriesBar from "@/components/ui/StoriesBar";
+import StoryViewer from "@/components/ui/StoryViewer";
 
 type Mode = "list" | "map";
 
@@ -74,6 +75,9 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 	const [addressLine, setAddressLine] = useState("");
 	const [sales, setSales] = useState<GarageSale[]>([]);
 
+	const [selectedStory, setSelectedStory] = useState<GarageSale | null>(null);
+	const [storyViewerVisible, setStoryViewerVisible] = useState(false);
+
 	const loadSales = useCallback(async () => {
 		try {
 			setLoading(true);
@@ -115,7 +119,6 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 		}
 	}, []);
 
-	// Key fix: refresh whenever user comes back to this screen
 	useFocusEffect(
 		useCallback(() => {
 			loadSales();
@@ -145,57 +148,92 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 		});
 	}, [sales, userLoc]);
 
-	const initialRegion: Region = useMemo(
+	const mapRegion: Region = useMemo(
 		() => ({
 			latitude: userLoc?.latitude ?? 43.4516,
 			longitude: userLoc?.longitude ?? -80.4925,
-			latitudeDelta: 0.06,
-			longitudeDelta: 0.06,
+			latitudeDelta: 0.04,
+			longitudeDelta: 0.04,
 		}),
 		[userLoc]
 	);
 
-	return (
-		<SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-			<HeaderBar />
+	const handleStoryPress = useCallback((sale: GarageSale) => {
+		setSelectedStory(sale);
+		setStoryViewerVisible(true);
+	}, []);
 
-			<View style={styles.content}>
-				<View style={styles.addressRow}>
-					<Text style={[styles.addressIcon, { color: theme.secondaryText }]}>
-						📍
-					</Text>
-					<Text
-						numberOfLines={1}
-						style={[styles.addressText, { color: theme.secondaryText }]}
-					>
-						{addressLine || "Fetching your location..."}
-					</Text>
+	const handleCloseStory = useCallback(() => {
+		setStoryViewerVisible(false);
+		setSelectedStory(null);
+	}, []);
+
+	// MAP MODE: full-screen map with UI floating on top
+	if (mode === "map") {
+		return (
+			<View style={styles.safe}>
+				{/* Full-screen map behind everything */}
+				<MapView
+					provider={PROVIDER_GOOGLE}
+					style={StyleSheet.absoluteFill}
+					region={mapRegion}
+					showsUserLocation={true}
+					showsMyLocationButton={true}
+				>
+					{salesWithDistance.map((s) => (
+						<Marker
+							key={s.id}
+							coordinate={{
+								latitude: s.location.latitude,
+								longitude: s.location.longitude,
+							}}
+							title={s.title}
+							description={s.location.address}
+						/>
+					))}
+				</MapView>
+
+				{/* Header with white background */}
+				<View style={styles.mapHeaderStrip}>
+					<SafeAreaView>
+						<HeaderBar mode={mode} onToggleMode={setMode} />
+					</SafeAreaView>
 				</View>
 
-				<Text style={[styles.title, { color: theme.text }]}>
-					Discover Nearby Sales
-				</Text>
-
-				<SegmentedControl
-					value={mode}
-					onChange={setMode}
-					leftLabel="List"
-					rightLabel="Map"
+				<StoryViewer
+					visible={storyViewerVisible}
+					sale={selectedStory}
+					onClose={handleCloseStory}
 				/>
+			</View>
+		);
+	}
 
-				<Text style={[styles.sectionTitle, { color: theme.text }]}>
-					✨ Happening Today
-				</Text>
+	// LIST MODE: standard scrollable layout
+	return (
+		<SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+			<GradientBackground />
+			<HeaderBar mode={mode} onToggleMode={setMode} />
+
+			<View style={styles.content}>
+				<Text style={[styles.title, { color: theme.text }]}>Discover</Text>
+
+				{!loading && (
+					<StoriesBar sales={salesWithDistance} onStoryPress={handleStoryPress} />
+				)}
 
 				{loading ? (
 					<View style={styles.loaderWrap}>
-						<ActivityIndicator />
+						<ActivityIndicator color={theme.tint} />
 					</View>
-				) : mode === "list" ? (
+				) : (
 					<FlatList
 						data={salesWithDistance}
 						keyExtractor={(item) => item.id}
-						contentContainerStyle={{ paddingBottom: 120 }}
+						contentContainerStyle={{
+							paddingBottom: 120,
+							flexGrow: 1,
+						}}
 						renderItem={({ item }) => (
 							<SaleCard
 								sale={item}
@@ -203,105 +241,72 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 								onPress={() => router.push(`/sale-detail/${item.id}`)}
 							/>
 						)}
+						ListEmptyComponent={
+							<View style={styles.emptyWrap}>
+								<Text style={[styles.emptyText, { color: theme.secondaryText }]}>
+									No garage sales nearby yet.
+								</Text>
+								<Text style={[styles.emptyHint, { color: theme.secondaryText }]}>
+									Pull down to refresh or check back later.
+								</Text>
+							</View>
+						}
 						showsVerticalScrollIndicator={false}
 						refreshControl={
 							<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
 						}
 					/>
-				) : (
-					<View style={styles.mapWrap}>
-						<MapView
-							provider={PROVIDER_DEFAULT}
-							style={StyleSheet.absoluteFill}
-							initialRegion={initialRegion}
-						>
-							{salesWithDistance.map((s) => (
-								<Marker
-									key={s.id}
-									coordinate={{
-										latitude: s.location.latitude,
-										longitude: s.location.longitude,
-									}}
-									title={s.title}
-									description={s.location.address}
-								/>
-							))}
-						</MapView>
-					</View>
 				)}
 			</View>
 
-			{/* Floating Action Button */}
-			<TouchableOpacity
-				style={styles.fab}
-				onPress={() => router.push("/sell")}
-				activeOpacity={0.9}
-			>
-				<Text style={styles.fabIcon}>+</Text>
-			</TouchableOpacity>
+			<StoryViewer
+				visible={storyViewerVisible}
+				sale={selectedStory}
+				onClose={handleCloseStory}
+			/>
 		</SafeAreaView>
 	);
 }
 
 const styles = StyleSheet.create({
 	safe: { flex: 1 },
-	content: { paddingHorizontal: 18, paddingTop: 10, flex: 1 },
-
-	addressRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 8,
-		marginTop: 4,
-		marginBottom: 8,
-	},
-	addressIcon: { fontSize: 14, fontWeight: "700", opacity: 0.9 },
-	addressText: { flex: 1, fontSize: 14, fontWeight: "600" },
+	content: { paddingHorizontal: 18, paddingTop: 6, flex: 1 },
 
 	title: {
-		fontSize: 34,
-		fontWeight: "800",
+		fontSize: 28,
+		fontWeight: "900",
 		letterSpacing: -0.4,
-		marginBottom: 14,
-	},
-
-	sectionTitle: {
-		fontSize: 22,
-		fontWeight: "800",
-		marginTop: 16,
 		marginBottom: 12,
 	},
 
 	loaderWrap: { paddingTop: 30 },
 
-	mapWrap: {
-		height: 520,
-		borderRadius: 18,
-		overflow: "hidden",
-		marginTop: 10,
-		borderWidth: 1,
-		borderColor: "#E6E1DA",
+	emptyWrap: {
+		flex: 1,
+		alignItems: "center",
+		justifyContent: "center",
+		paddingTop: 60,
+	},
+	emptyText: {
+		fontSize: 16,
+		fontWeight: "600",
+	},
+	emptyHint: {
+		fontSize: 14,
+		marginTop: 6,
 	},
 
-	fab: {
+	mapOverlay: {
 		position: "absolute",
-		right: 20,
-		bottom: 100,
-		width: 64,
-		height: 64,
-		borderRadius: 32,
-		backgroundColor: "#D97B3F",
-		justifyContent: "center",
-		alignItems: "center",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.3,
-		shadowRadius: 8,
-		elevation: 8,
+		top: 0,
+		left: 0,
+		right: 0,
 	},
-	fabIcon: {
-		fontSize: 32,
-		color: "#fff",
-		fontWeight: "300",
-		lineHeight: 36,
+	mapHeaderStrip: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		backgroundColor: "#FFFFFF",
 	},
 });

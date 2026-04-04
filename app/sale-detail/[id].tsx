@@ -1,7 +1,7 @@
-import { ThemedText } from "@/components/themed-text";
 import { garageSaleService } from "@/services/garageSaleService";
 import { GarageSale } from "@/types/garageSale";
 import { MaterialIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
@@ -18,6 +18,17 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
+
+const CATEGORY_COLORS: Record<string, string> = {
+	Furniture: "#DF6B4F",
+	Electronics: "#6BAA8E",
+	Kids: "#6366B5",
+	Kitchen: "#E3BF60",
+	Clothing: "#F9AD85",
+	Books: "#6BAA8E",
+	Sports: "#6366B5",
+	Tools: "#807A73",
+};
 
 function haversineKm(
 	a: { latitude: number; longitude: number },
@@ -88,12 +99,12 @@ export default function ViewSaleScreen() {
 		const km = haversineKm(userLoc, sale.location);
 		const feet = km * 3280.84;
 		return feet >= 5280
-			? `${Math.round(feet / 5280)} miles away`
-			: `${Math.round(feet)} feet away`;
+			? `${(feet / 5280).toFixed(1)} mi`
+			: `${Math.round(feet)} ft`;
 	}, [sale, userLoc]);
 
 	const formatFullDate = (dateStr: string) => {
-		return new Date(dateStr).toLocaleDateString("en-US", {
+		return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
 			weekday: "long",
 			month: "long",
 			day: "numeric",
@@ -107,9 +118,9 @@ export default function ViewSaleScreen() {
 			const [hh, mm] = t.split(":").map(Number);
 			const ampm = hh >= 12 ? "PM" : "AM";
 			const h = ((hh + 11) % 12) + 1;
-			return `${h}${mm ? `:${String(mm).padStart(2, "0")}` : ""} ${ampm}`;
+			return `${h}:${String(mm).padStart(2, "0")} ${ampm}`;
 		};
-		return `${to12(startTime)} - ${to12(endTime)}`;
+		return `${to12(startTime)} \u2013 ${to12(endTime)}`;
 	};
 
 	const handleShare = async () => {
@@ -121,17 +132,11 @@ export default function ViewSaleScreen() {
 		const shareText = `${sale.title}\n\n${dateStr}\n${timeStr}\n\n${sale.location.address}\n\n${deepLink}`;
 
 		try {
-			const shareOptions: { title?: string; message?: string; url?: string } = {
-				title: sale.title,
-				message: shareText,
-			};
-			
-			// Add URL for iOS (optional, iOS will handle it)
-			if (Platform.OS === "ios") {
-				shareOptions.url = deepLink;
-			}
-			
-			await Share.share(shareOptions);
+			await Share.share(
+				Platform.OS === "ios"
+					? { title: sale.title, message: shareText, url: deepLink }
+					: { title: sale.title, message: shareText }
+			);
 		} catch (error) {
 			console.error("Error sharing:", error);
 		}
@@ -147,15 +152,13 @@ export default function ViewSaleScreen() {
 				const url = `http://maps.apple.com/?daddr=${latitude},${longitude}`;
 				Linking.openURL(url);
 			} else {
-				// Try Google Navigation first, fallback to web URL
 				const navUrl = `google.navigation:q=${latitude},${longitude}`;
 				const webUrl = `https://maps.google.com/?q=${latitude},${longitude}`;
-				
+
 				const canOpen = await Linking.canOpenURL(navUrl);
 				Linking.openURL(canOpen ? navUrl : webUrl);
 			}
 		} else if (address) {
-			// Fallback to address-based search if lat/long missing
 			const encodedAddress = encodeURIComponent(address);
 			const url =
 				Platform.OS === "ios"
@@ -178,12 +181,12 @@ export default function ViewSaleScreen() {
 	if (loading || !sale) {
 		return (
 			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="large" color="#D97B3F" />
+				<ActivityIndicator size="large" color="#DF6B4F" />
 			</View>
 		);
 	}
 
-	const heroImage = sale.images?.[0] || sale.videoUrl;
+	const heroImage = sale.images?.[0] || null;
 
 	return (
 		<View style={styles.container}>
@@ -193,7 +196,7 @@ export default function ViewSaleScreen() {
 					<Image source={{ uri: heroImage }} style={styles.heroImage} />
 				) : (
 					<View style={styles.heroPlaceholder}>
-						<MaterialIcons name="photo" size={48} color="#999" />
+						<MaterialIcons name="photo" size={48} color="#C4BFB8" />
 					</View>
 				)}
 
@@ -203,7 +206,7 @@ export default function ViewSaleScreen() {
 					onPress={() => router.back()}
 					activeOpacity={0.8}
 				>
-					<MaterialIcons name="arrow-back" size={22} color="#4A3A2A" />
+					<MaterialIcons name="chevron-left" size={28} color="#23201C" />
 				</TouchableOpacity>
 
 				{/* Share Button */}
@@ -212,7 +215,7 @@ export default function ViewSaleScreen() {
 					onPress={handleShare}
 					activeOpacity={0.8}
 				>
-					<MaterialIcons name="share" size={22} color="#4A3A2A" />
+					<MaterialIcons name="share" size={22} color="#23201C" />
 				</TouchableOpacity>
 			</View>
 
@@ -223,101 +226,94 @@ export default function ViewSaleScreen() {
 				showsVerticalScrollIndicator={false}
 			>
 				<View style={styles.contentCard}>
-					{/* Title */}
-					<Text style={styles.title}>{sale.title}</Text>
-
-					{/* Tags/Categories */}
-					{sale.categories && sale.categories.length > 0 && (
-						<View style={styles.tagsContainer}>
-							<MaterialIcons
-								name="local-offer"
-								size={18}
-								color="#FF9500"
-								style={styles.tagIcon}
-							/>
-							<View style={styles.tagsRow}>
-								{sale.categories.map((category, index) => (
-									<View key={index} style={styles.tag}>
-										<Text style={styles.tagText}>{category}</Text>
-									</View>
-								))}
+					{/* Title + Distance */}
+					<View style={styles.titleRow}>
+						<Text style={styles.title}>{sale.title}</Text>
+						{distanceText && (
+							<View style={styles.distanceBadge}>
+								<Text style={styles.distanceText}>{distanceText}</Text>
 							</View>
-						</View>
-					)}
-
-					{/* Date and Time */}
-					<View style={styles.detailRow}>
-						<MaterialIcons
-							name="event"
-							size={20}
-							color="#FF9500"
-							style={styles.detailIcon}
-						/>
-						<View style={styles.detailContent}>
-							<Text style={styles.detailValue}>
-								{formatFullDate(sale.startDate || sale.date)}
-							</Text>
-							<Text style={styles.detailSubtext}>
-								{formatTimeRange(sale.startTime, sale.endTime)}
-							</Text>
-						</View>
+						)}
 					</View>
 
-					{/* Address and Distance */}
-					<View style={styles.detailRow}>
-						<MaterialIcons
-							name="location-on"
-							size={20}
-							color="#FF9500"
-							style={styles.detailIcon}
-						/>
-						<View style={styles.detailContent}>
-							<Text style={styles.detailValue}>{sale.location.address}</Text>
-							{distanceText && (
-								<Text style={styles.detailSubtext}>{distanceText}</Text>
-							)}
-						</View>
+					{/* Date and Time Card */}
+					<View style={styles.infoCard}>
+						<Text style={styles.infoTitle}>
+							{formatFullDate(sale.startDate || sale.date)}
+						</Text>
+						<Text style={styles.infoSub}>
+							{formatTimeRange(sale.startTime, sale.endTime)}
+						</Text>
 					</View>
 
 					{/* Description */}
 					{sale.description && (
-						<Text style={styles.description}>{sale.description}</Text>
+						<View style={styles.descSection}>
+							<Text style={styles.descLabel}>Description</Text>
+							<Text style={styles.descText}>{sale.description}</Text>
+						</View>
 					)}
+
+					{/* Categories */}
+					{sale.categories && sale.categories.length > 0 && (
+						<View style={styles.tagsRow}>
+							{sale.categories.map((category, index) => {
+								const color = CATEGORY_COLORS[category] || "#807A73";
+								return (
+									<View
+										key={index}
+										style={[
+											styles.tag,
+											{
+												borderColor: color,
+											},
+										]}
+									>
+										<Text style={[styles.tagText, { color }]}>
+											{category}
+										</Text>
+									</View>
+								);
+							})}
+						</View>
+					)}
+
+					{/* Location Card */}
+					<View style={styles.infoCard}>
+						<Text style={styles.locationLabel}>Location</Text>
+						<Text style={styles.locationAddress}>
+							{sale.location.address}
+						</Text>
+					</View>
 
 					{/* Host Section */}
 					{sale.contactName && (
-						<View style={styles.hostSection}>
+						<View style={styles.hostCard}>
 							<View style={styles.hostAvatar}>
-								<MaterialIcons name="person" size={24} color="#4A90E2" />
+								<MaterialIcons name="person" size={24} color="#807A73" />
 							</View>
 							<View style={styles.hostInfo}>
-								<Text style={styles.hostName}>{sale.contactName}</Text>
-								<Text style={styles.hostRole}>Host</Text>
+								<Text style={styles.hostName}>
+									Hosted by {sale.contactName}
+								</Text>
+								<Text style={styles.hostRole}>Verified seller</Text>
 							</View>
-							{(sale.contactPhone || sale.contactEmail) && (
+							{sale.contactPhone && (
 								<View style={styles.hostActions}>
-									{sale.contactPhone && (
-										<>
-											<TouchableOpacity
-												style={styles.hostActionButton}
-												onPress={handleCall}
-												activeOpacity={0.7}
-											>
-												<MaterialIcons name="phone" size={18} color="#FF9500" />
-											</TouchableOpacity>
-											<TouchableOpacity
-												style={styles.hostActionButton}
-												onPress={handleMessage}
-												activeOpacity={0.7}
-											>
-												<MaterialIcons
-													name="sms"
-													size={18}
-													color="#FF9500"
-												/>
-											</TouchableOpacity>
-										</>
-									)}
+									<TouchableOpacity
+										style={styles.hostActionButton}
+										onPress={handleCall}
+										activeOpacity={0.7}
+									>
+										<MaterialIcons name="phone" size={18} color="#DF6B4F" />
+									</TouchableOpacity>
+									<TouchableOpacity
+										style={styles.hostActionButton}
+										onPress={handleMessage}
+										activeOpacity={0.7}
+									>
+										<MaterialIcons name="sms" size={18} color="#DF6B4F" />
+									</TouchableOpacity>
 								</View>
 							)}
 						</View>
@@ -328,12 +324,17 @@ export default function ViewSaleScreen() {
 			{/* Fixed Get Directions Button */}
 			<View style={styles.ctaContainer}>
 				<TouchableOpacity
-					style={styles.ctaButton}
 					onPress={handleGetDirections}
 					activeOpacity={0.9}
 				>
-					<MaterialIcons name="near-me" size={20} color="#FFFFFF" />
-					<Text style={styles.ctaText}>Get Directions</Text>
+					<LinearGradient
+						colors={["#DF6B4F", "#F9AD85"]}
+						start={{ x: 0, y: 0.5 }}
+						end={{ x: 1, y: 0.5 }}
+						style={styles.ctaButton}
+					>
+						<Text style={styles.ctaText}>Get Directions</Text>
+					</LinearGradient>
 				</TouchableOpacity>
 			</View>
 		</View>
@@ -343,18 +344,17 @@ export default function ViewSaleScreen() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#FAF7F2",
+		backgroundColor: "#F7F6F4",
 	},
 	loadingContainer: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
-		backgroundColor: "#FAF7F2",
+		backgroundColor: "#F7F6F4",
 	},
 
-	// Hero Section
 	heroContainer: {
-		height: 320,
+		height: 280,
 		width: "100%",
 		position: "relative",
 	},
@@ -365,130 +365,137 @@ const styles = StyleSheet.create({
 	heroPlaceholder: {
 		width: "100%",
 		height: "100%",
-		backgroundColor: "#E6E1DA",
+		backgroundColor: "#F1EDE8",
 		justifyContent: "center",
 		alignItems: "center",
 	},
 	floatingButton: {
 		position: "absolute",
-		top: 50,
+		top: 54,
 		left: 16,
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		backgroundColor: "#FAF7F2",
+		width: 40,
+		height: 40,
+		borderRadius: 20,
 		justifyContent: "center",
 		alignItems: "center",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 3,
 	},
 	floatingButtonRight: {
 		left: undefined,
 		right: 16,
 	},
 
-	// Scrollable Content
 	scrollView: {
 		flex: 1,
 	},
 	scrollContent: {
-		paddingBottom: 100,
+		paddingBottom: 110,
 	},
 	contentCard: {
-		backgroundColor: "#FFFFFF",
-		borderTopLeftRadius: 24,
-		borderTopRightRadius: 24,
+		backgroundColor: "#F7F6F4",
 		padding: 20,
-		marginTop: -24,
-		minHeight: 500,
 	},
 
-	// Title
-	title: {
-		fontSize: 28,
-		fontWeight: "700",
-		color: "#1F1F1F",
+	titleRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
 		marginBottom: 16,
+	},
+	title: {
+		fontSize: 22,
+		fontWeight: "900",
+		color: "#23201C",
 		letterSpacing: -0.3,
-	},
-
-	// Tags
-	tagsContainer: {
-		flexDirection: "row",
-		alignItems: "flex-start",
-		marginBottom: 20,
-	},
-	tagIcon: {
-		marginRight: 8,
-		marginTop: 2,
-	},
-	tagsRow: {
-		flexDirection: "row",
-		flexWrap: "wrap",
 		flex: 1,
 	},
-	tag: {
-		backgroundColor: "#FFE8D1",
-		borderRadius: 16,
-		paddingHorizontal: 14,
+	distanceBadge: {
+		backgroundColor: "#F1EDE8",
+		borderRadius: 12,
 		paddingVertical: 6,
-		marginRight: 8,
-		marginBottom: 8,
+		paddingHorizontal: 12,
+		marginLeft: 12,
 	},
-	tagText: {
-		color: "#FF9500",
-		fontSize: 14,
-		fontWeight: "600",
+	distanceText: {
+		fontSize: 13,
+		fontWeight: "700",
+		color: "#23201C",
 	},
 
-	// Detail Rows
-	detailRow: {
-		flexDirection: "row",
-		marginBottom: 20,
+	infoCard: {
+		backgroundColor: "#FFFFFF",
+		borderRadius: 18,
+		padding: 16,
+		marginBottom: 16,
 	},
-	detailIcon: {
-		marginRight: 12,
-		marginTop: 2,
-	},
-	detailContent: {
-		flex: 1,
-	},
-	detailValue: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#1F1F1F",
+	infoTitle: {
+		fontSize: 15,
+		fontWeight: "700",
+		color: "#23201C",
 		marginBottom: 4,
 	},
-	detailSubtext: {
+	infoSub: {
 		fontSize: 14,
-		color: "#6F6A64",
+		color: "#807A73",
 		fontWeight: "500",
 	},
 
-	// Description
-	description: {
+	descSection: {
+		marginBottom: 16,
+	},
+	descLabel: {
+		fontSize: 16,
+		fontWeight: "800",
+		color: "#23201C",
+		marginBottom: 8,
+	},
+	descText: {
 		fontSize: 15,
 		lineHeight: 22,
-		color: "#1F1F1F",
-		marginBottom: 24,
+		color: "#23201C",
 	},
 
-	// Host Section
-	hostSection: {
+	tagsRow: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 8,
+		marginBottom: 16,
+	},
+	tag: {
+		borderRadius: 999,
+		paddingHorizontal: 14,
+		paddingVertical: 7,
+		borderWidth: 1.5,
+	},
+	tagText: {
+		fontSize: 13,
+		fontWeight: "600",
+	},
+
+	locationLabel: {
+		fontSize: 15,
+		fontWeight: "700",
+		color: "#23201C",
+		marginBottom: 4,
+	},
+	locationAddress: {
+		fontSize: 14,
+		color: "#807A73",
+		fontWeight: "500",
+	},
+
+	hostCard: {
 		flexDirection: "row",
 		alignItems: "center",
 		padding: 16,
-		backgroundColor: "#FAF7F2",
-		borderRadius: 16,
+		backgroundColor: "#FFFFFF",
+		borderRadius: 18,
+		marginTop: 4,
 	},
 	hostAvatar: {
-		width: 48,
-		height: 48,
-		borderRadius: 24,
-		backgroundColor: "#F1EDE6",
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: "#F1EDE8",
 		justifyContent: "center",
 		alignItems: "center",
 		marginRight: 12,
@@ -497,14 +504,14 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	hostName: {
-		fontSize: 16,
+		fontSize: 15,
 		fontWeight: "600",
-		color: "#1F1F1F",
+		color: "#23201C",
 		marginBottom: 2,
 	},
 	hostRole: {
 		fontSize: 13,
-		color: "#6F6A64",
+		color: "#807A73",
 		fontWeight: "500",
 	},
 	hostActions: {
@@ -519,38 +526,30 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		alignItems: "center",
 		borderWidth: 1,
-		borderColor: "#E6E1DA",
+		borderColor: "#E8E5E1",
 	},
 
-	// CTA Button
 	ctaContainer: {
 		position: "absolute",
 		bottom: 0,
 		left: 0,
 		right: 0,
-		padding: 16,
-		backgroundColor: "#FFFFFF",
-		borderTopWidth: 1,
-		borderTopColor: "#E6E1DA",
-		paddingBottom: 20,
+		padding: 20,
+		paddingBottom: 40,
 	},
 	ctaButton: {
-		backgroundColor: "#FF9500",
-		borderRadius: 14,
+		borderRadius: 18,
 		paddingVertical: 16,
-		flexDirection: "row",
-		justifyContent: "center",
 		alignItems: "center",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 3,
+		shadowColor: "#DF6B4F",
+		shadowOffset: { width: 0, height: 6 },
+		shadowOpacity: 0.3,
+		shadowRadius: 18,
+		elevation: 6,
 	},
 	ctaText: {
 		color: "#FFFFFF",
 		fontSize: 16,
 		fontWeight: "700",
-		marginLeft: 8,
 	},
 });

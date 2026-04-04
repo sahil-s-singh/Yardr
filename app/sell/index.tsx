@@ -1,58 +1,26 @@
-// app/sell/index.tsx
+// app/sell/index.tsx — Step 1: Record Video
+import GradientBackground from "@/components/ui/GradientBackground";
+import ProgressBar from "@/components/ui/ProgressBar";
+import { saveSellDraft } from "@/lib/draftSale";
+import { MaterialIcons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { saveSellDraft } from "@/lib/draftSale";
-
-function StepHeader() {
-	return (
-		<View style={styles.stepWrap}>
-			<Text style={styles.title}>Add Sale</Text>
-
-			<View style={styles.stepsRow}>
-				<View style={styles.stepItem}>
-					<View style={[styles.stepCircle, styles.stepActive]}>
-						<IconSymbol name="video.fill" size={22} color="#fff" />
-					</View>
-					<Text style={[styles.stepLabel, styles.stepLabelActive]}>
-						Record Video
-					</Text>
-				</View>
-
-				<View style={styles.stepLine} />
-
-				<View style={styles.stepItem}>
-					<View style={styles.stepCircle}>
-						<IconSymbol name="eye.fill" size={22} color="#B8B1A9" />
-					</View>
-					<Text style={styles.stepLabel}>Review</Text>
-				</View>
-
-				<View style={styles.stepLine} />
-
-				<View style={styles.stepItem}>
-					<View style={styles.stepCircle}>
-						<IconSymbol
-							name="checkmark.circle.fill"
-							size={22}
-							color="#B8B1A9"
-						/>
-					</View>
-					<Text style={styles.stepLabel}>Publish</Text>
-				</View>
-			</View>
-		</View>
-	);
-}
+import {
+	Alert,
+	SafeAreaView,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
+} from "react-native";
 
 export default function RecordVideoScreen() {
 	const cameraRef = useRef<CameraView>(null);
 	const [permission, requestPermission] = useCameraPermissions();
 	const [isRecording, setIsRecording] = useState(false);
 	const [cameraReady, setCameraReady] = useState(false);
+	const [facing, setFacing] = useState<"back" | "front">("back");
 
 	useEffect(() => {
 		if (permission && !permission.granted) {
@@ -71,7 +39,7 @@ export default function RecordVideoScreen() {
 
 			try {
 				const video = await cameraRef.current.recordAsync({
-					maxDuration: 5, // seconds
+					maxDuration: 5,
 				});
 
 				if (!video?.uri) {
@@ -96,164 +64,249 @@ export default function RecordVideoScreen() {
 
 	if (!permission?.granted) {
 		return (
-			<View style={styles.container}>
-				<Text style={{ textAlign: "center", marginBottom: 20 }}>
-					Camera permission is required to record a video.
-				</Text>
-				<TouchableOpacity onPress={requestPermission}>
-					<Text style={{ color: "#E9833A", fontWeight: "bold" }}>
-						Grant Permission
+			<SafeAreaView style={styles.safe}>
+				<GradientBackground />
+				<View style={styles.permissionWrap}>
+					<MaterialIcons name="videocam-off" size={48} color="#807A73" />
+					<Text style={styles.permissionTitle}>Camera Access Needed</Text>
+					<Text style={styles.permissionSub}>
+						We need camera permission to record a video of your sale items.
 					</Text>
-				</TouchableOpacity>
-			</View>
+					<TouchableOpacity
+						style={styles.permissionBtn}
+						onPress={requestPermission}
+					>
+						<Text style={styles.permissionBtnText}>Allow Camera</Text>
+					</TouchableOpacity>
+				</View>
+			</SafeAreaView>
 		);
 	}
 
 	return (
-		<View style={styles.container}>
-			<StepHeader />
+		<SafeAreaView style={styles.safe}>
+			<GradientBackground />
 
-			<View style={styles.infoBox}>
-				<Text style={styles.infoText}>
-					Record a video walkthrough of your sale items (minimum 5 seconds). Our
-					AI will analyze it and generate tags automatically.
-				</Text>
+			{/* Header */}
+			<View style={styles.header}>
+				<TouchableOpacity onPress={() => router.back()}>
+					<Text style={styles.backChevron}>{"\u2039"}</Text>
+				</TouchableOpacity>
+				<Text style={styles.headerTitle}>Record Video</Text>
+				<View style={{ width: 20 }} />
 			</View>
 
-			<View style={styles.cameraBox}>
+			{/* Progress Bar */}
+			<ProgressBar step={1} />
+
+			{/* Camera Preview */}
+			<View style={styles.cameraWrap}>
 				<CameraView
 					ref={cameraRef}
 					style={StyleSheet.absoluteFill}
-					facing="back"
-					mode="video" // ← THIS IS THE CRITICAL FIX FOR SDK 51+
+					facing={facing}
+					mode="video"
 					onCameraReady={() => setCameraReady(true)}
 				/>
 
-				<TouchableOpacity
-					style={[
-						styles.recordButton,
-						!cameraReady && styles.recordButtonDisabled,
-					]}
-					onPress={toggleRecording}
-					disabled={!cameraReady}
-					activeOpacity={0.9}
-				>
-					<IconSymbol
-						name={isRecording ? "stop.fill" : "video.fill"}
-						size={26}
-						color="#fff"
-					/>
+				{/* Corner brackets */}
+				<View style={[styles.corner, styles.cornerTL]} />
+				<View style={[styles.corner, styles.cornerTR]} />
+				<View style={[styles.corner, styles.cornerBL]} />
+				<View style={[styles.corner, styles.cornerBR]} />
+
+				{!cameraReady && (
+					<Text style={styles.cameraHint}>Point camera at your items</Text>
+				)}
+			</View>
+
+			{/* Controls */}
+			<View style={styles.controls}>
+				{/* Gallery */}
+				<TouchableOpacity style={styles.sideBtn}>
+					<MaterialIcons name="photo-library" size={24} color="#807A73" />
 				</TouchableOpacity>
 
-				<Text style={styles.recordHint}>
-					{!cameraReady
-						? "Camera loading..."
-						: isRecording
-						? "Recording… tap to stop"
-						: "Tap to start recording (5 seconds)"}
-				</Text>
+				{/* Record Button */}
+				<TouchableOpacity
+					style={styles.recordOuter}
+					onPress={toggleRecording}
+					disabled={!cameraReady}
+					activeOpacity={0.85}
+				>
+					<View
+						style={[
+							styles.recordInner,
+							isRecording && styles.recordInnerActive,
+							!cameraReady && { opacity: 0.4 },
+						]}
+					>
+						{isRecording ? (
+							<MaterialIcons name="stop" size={28} color="#fff" />
+						) : (
+							<View style={styles.recordDot} />
+						)}
+					</View>
+				</TouchableOpacity>
+
+				{/* Flip Camera */}
+				<TouchableOpacity
+					style={styles.sideBtn}
+					onPress={() => setFacing(facing === "back" ? "front" : "back")}
+				>
+					<MaterialIcons name="cameraswitch" size={24} color="#807A73" />
+				</TouchableOpacity>
 			</View>
-		</View>
+		</SafeAreaView>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: {
+	safe: { flex: 1, backgroundColor: "#F7F6F4" },
+
+	header: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingHorizontal: 16,
+		paddingVertical: 8,
+	},
+	backChevron: {
+		fontSize: 28,
+		fontWeight: "700",
+		color: "#23201C",
+	},
+	headerTitle: {
 		flex: 1,
-		backgroundColor: "#FAF7F2",
-		paddingHorizontal: 18,
-	},
-
-	title: {
 		textAlign: "center",
-		fontSize: 22,
-		fontWeight: "800",
-		marginTop: 16,
+		fontSize: 18,
+		fontWeight: "700",
+		color: "#23201C",
 	},
 
-	stepWrap: { marginBottom: 18 },
+	cameraWrap: {
+		flex: 1,
+		marginHorizontal: 16,
+		borderRadius: 24,
+		overflow: "hidden",
+		backgroundColor: "#1A1A1C",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	cameraHint: {
+		color: "#737373",
+		fontSize: 15,
+		fontWeight: "500",
+	},
 
-	stepsRow: {
-		marginTop: 14,
+	// Corner brackets
+	corner: {
+		position: "absolute",
+		width: 32,
+		height: 32,
+		borderColor: "rgba(255,255,255,0.2)",
+	},
+	cornerTL: {
+		top: 24,
+		left: 24,
+		borderTopWidth: 2,
+		borderLeftWidth: 2,
+	},
+	cornerTR: {
+		top: 24,
+		right: 24,
+		borderTopWidth: 2,
+		borderRightWidth: 2,
+	},
+	cornerBL: {
+		bottom: 24,
+		left: 24,
+		borderBottomWidth: 2,
+		borderLeftWidth: 2,
+	},
+	cornerBR: {
+		bottom: 24,
+		right: 24,
+		borderBottomWidth: 2,
+		borderRightWidth: 2,
+	},
+
+	controls: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
+		paddingVertical: 20,
+		paddingBottom: 30,
+		gap: 50,
 	},
-
-	stepItem: { alignItems: "center", width: 110 },
-
-	stepCircle: {
+	sideBtn: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: "rgba(255,255,255,0.5)",
+		borderWidth: 1,
+		borderColor: "rgba(232,229,225,0.5)",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	recordOuter: {
+		width: 72,
+		height: 72,
+		borderRadius: 36,
+		borderWidth: 3,
+		borderColor: "rgba(223,107,79,0.3)",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	recordInner: {
 		width: 52,
 		height: 52,
 		borderRadius: 26,
-		backgroundColor: "#EEE7DD",
+		backgroundColor: "#DF6B4F",
 		alignItems: "center",
 		justifyContent: "center",
 	},
-
-	stepActive: {
-		backgroundColor: "#E9833A",
+	recordInnerActive: {
+		backgroundColor: "#E05244",
+		borderRadius: 12,
+		width: 44,
+		height: 44,
+	},
+	recordDot: {
+		width: 20,
+		height: 20,
+		borderRadius: 10,
+		backgroundColor: "rgba(255,255,255,0.9)",
 	},
 
-	stepLabel: {
-		marginTop: 8,
-		fontSize: 13,
-		color: "#9A9289",
+	permissionWrap: {
+		flex: 1,
+		alignItems: "center",
+		justifyContent: "center",
+		paddingHorizontal: 40,
+	},
+	permissionTitle: {
+		fontSize: 20,
 		fontWeight: "700",
+		color: "#23201C",
+		marginTop: 16,
 	},
-
-	stepLabelActive: {
-		color: "#E9833A",
-	},
-
-	stepLine: {
-		width: 42,
-		height: 4,
-		borderRadius: 2,
-		backgroundColor: "#E6E1DA",
-	},
-
-	infoBox: {
-		backgroundColor: "#FFF5E8",
-		borderRadius: 18,
-		padding: 16,
-		marginBottom: 18,
-	},
-
-	infoText: {
+	permissionSub: {
 		fontSize: 15,
-		lineHeight: 22,
-		color: "#6B625A",
+		color: "#807A73",
 		textAlign: "center",
-		fontWeight: "600",
+		marginTop: 8,
+		lineHeight: 22,
 	},
-
-	cameraBox: {
-		height: 280,
-		borderRadius: 24,
-		backgroundColor: "#000",
-		overflow: "hidden",
-		alignItems: "center",
-		justifyContent: "center",
+	permissionBtn: {
+		marginTop: 24,
+		backgroundColor: "#DF6B4F",
+		borderRadius: 18,
+		paddingVertical: 14,
+		paddingHorizontal: 28,
 	},
-
-	recordButton: {
-		width: 86,
-		height: 86,
-		borderRadius: 43,
-		backgroundColor: "#D9413A",
-		alignItems: "center",
-		justifyContent: "center",
-	},
-
-	recordButtonDisabled: {
-		backgroundColor: "#A09A94",
-	},
-
-	recordHint: {
-		position: "absolute",
-		bottom: 18,
+	permissionBtnText: {
 		color: "#fff",
+		fontSize: 16,
 		fontWeight: "700",
 	},
 });
