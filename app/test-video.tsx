@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { StyleSheet, View, Alert, TouchableOpacity } from 'react-native';
-import { router } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import VideoRecorder from '@/components/VideoRecorder';
 import { analyzeGarageSaleVideo } from '@/lib/claude';
 import { videoService } from '@/services/videoService';
+import { EncodingType, readAsStringAsync } from 'expo-file-system/legacy';
+import { router } from 'expo-router';
 import * as VideoThumbnails from 'expo-video-thumbnails';
-import { readAsStringAsync, EncodingType } from 'expo-file-system/legacy';
+import { useState } from 'react';
+import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function TestVideoScreen() {
   const [showCamera, setShowCamera] = useState(false);
@@ -157,94 +157,94 @@ export default function TestVideoScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    padding: 20,
-    paddingTop: 60,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    marginBottom: 10,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#0066FF',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  description: {
-    fontSize: 16,
-    marginBottom: 20,
-    opacity: 0.7,
-  },
-  stepsContainer: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
-    marginBottom: 20,
-  },
-  step: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  startButton: {
-    backgroundColor: '#0066FF',
-    padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  startButtonText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  resultContainer: {
-    backgroundColor: '#e8f5e9',
-    padding: 20,
-    borderRadius: 10,
-    marginBottom: 20,
-  },
-  resultTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  resultText: {
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  bold: {
-    fontWeight: 'bold',
-  },
-  requirementsContainer: {
-    backgroundColor: '#fff3cd',
-    padding: 15,
-    borderRadius: 10,
-  },
-  requirementsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  requirement: {
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 16,
-    marginTop: 10,
-    opacity: 0.7,
-  },
+	container: {
+		flex: 1,
+		backgroundColor: "#f5f5f5",
+	},
+	header: {
+		padding: 20,
+		paddingTop: 60,
+		borderBottomWidth: 1,
+		borderBottomColor: "#e0e0e0",
+	},
+	backButton: {
+		marginBottom: 10,
+	},
+	backButtonText: {
+		fontSize: 16,
+		color: "#DF6B4F",
+	},
+	content: {
+		flex: 1,
+		padding: 20,
+	},
+	sectionTitle: {
+		fontSize: 24,
+		fontWeight: "bold",
+		marginBottom: 10,
+	},
+	description: {
+		fontSize: 16,
+		marginBottom: 20,
+		opacity: 0.7,
+	},
+	stepsContainer: {
+		backgroundColor: "#fff",
+		padding: 20,
+		borderRadius: 10,
+		marginBottom: 20,
+	},
+	step: {
+		fontSize: 16,
+		marginBottom: 10,
+	},
+	startButton: {
+		backgroundColor: "#DF6B4F",
+		padding: 20,
+		borderRadius: 10,
+		alignItems: "center",
+		marginBottom: 20,
+	},
+	startButtonText: {
+		color: "#fff",
+		fontSize: 20,
+		fontWeight: "bold",
+	},
+	resultContainer: {
+		backgroundColor: "#e8f5e9",
+		padding: 20,
+		borderRadius: 10,
+		marginBottom: 20,
+	},
+	resultTitle: {
+		fontSize: 18,
+		fontWeight: "bold",
+		marginBottom: 10,
+	},
+	resultText: {
+		fontSize: 14,
+		marginBottom: 8,
+	},
+	bold: {
+		fontWeight: "bold",
+	},
+	requirementsContainer: {
+		backgroundColor: "#fff3cd",
+		padding: 15,
+		borderRadius: 10,
+	},
+	requirementsTitle: {
+		fontSize: 16,
+		fontWeight: "bold",
+		marginBottom: 10,
+	},
+	requirement: {
+		fontSize: 14,
+		marginBottom: 5,
+	},
+	subtitle: {
+		fontSize: 16,
+		marginTop: 10,
+		opacity: 0.7,
+	},
 });
