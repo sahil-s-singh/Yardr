@@ -1,30 +1,51 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Theme tokens used across the app.
+ * Fresh palette: Terracotta primary with Sage, Indigo, Gold, Peach accents.
  */
 
-import { Platform } from 'react-native';
+const primary = "#DF6B4F";
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+export const Accent = {
+	sage: "#6BAA8E",
+	indigo: "#6366B5",
+	gold: "#E3BF60",
+	peach: "#F9AD85",
+	primaryLight: "#F0A48E",
+	error: "#E05244",
+};
 
 export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-  },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-  },
+	light: {
+		text: "#23201C",
+		background: "#F7F6F4",
+		tint: primary,
+		icon: "#807A73",
+		tabIconDefault: "#807A73",
+		tabIconSelected: primary,
+
+		card: "#FFFFFF",
+		muted: "#F1EDE8",
+		border: "#E8E5E1",
+		secondaryText: "#807A73",
+
+		shadow: "#000000",
+	},
+
+	dark: {
+		text: "#ECEDEE",
+		background: "#151718",
+		tint: primary,
+		icon: "#9BA1A6",
+		tabIconDefault: "#9BA1A6",
+		tabIconSelected: primary,
+
+		card: "#1E1F22",
+		muted: "#2A2B2E",
+		border: "#2F3136",
+		secondaryText: "#B5BCC2",
+
+		shadow: "#000000",
+	},
 };
 
 export const Fonts = Platform.select({

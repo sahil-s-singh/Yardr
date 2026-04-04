@@ -61,7 +61,7 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
       });
 
       setIsRecording(false);
-      setRecordedVideo(video.uri);
+      if (video) setRecordedVideo(video.uri);
     } catch (error) {
       console.error('Error recording video:', error);
       Alert.alert('Error', 'Failed to record video');

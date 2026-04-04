@@ -1,9 +1,9 @@
-import { GarageSale } from '@/types/garageSale';
-import { supabase } from '@/lib/supabase';
-import { checkNewSaleAgainstWishlists } from './wishlistService';
-import { recheckSaleAgainstWishlists } from './matchUpdateService';
-import { mapGarageSaleRow } from '@/lib/mappers';
 import { calculateDistance } from '@/lib/locationUtils';
+import { mapGarageSaleRow } from '@/lib/mappers';
+import { supabase } from '@/lib/supabase';
+import { GarageSale } from '@/types/garageSale';
+import { recheckSaleAgainstWishlists } from './matchUpdateService';
+import { checkNewSaleAgainstWishlists } from './wishlistService';
 
 // Service functions
 export const garageSaleService = {
@@ -311,3 +311,66 @@ export const garageSaleService = {
   },
 };
 
+// Helper function to calculate distance between two points (Haversine formula)
+const calculateDistance = (
+	point1: { latitude: number; longitude: number },
+	point2: { latitude: number; longitude: number }
+): number => {
+	const R = 6371; // Earth's radius in kilometers
+	const dLat = toRad(point2.latitude - point1.latitude);
+	const dLon = toRad(point2.longitude - point1.longitude);
+	const lat1 = toRad(point1.latitude);
+	const lat2 = toRad(point2.latitude);
+
+	const a =
+		Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+		Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+	return R * c;
+};
+
+const toRad = (value: number): number => {
+	return (value * Math.PI) / 180;
+};
+
+async function getNearbyActiveSales(lat: number, lng: number, radiusKm = 10) {
+	const { data, error } = await supabase
+		.from("garage_sales")
+		.select("*")
+		.eq("is_active", true)
+		.not("location", "is", null);
+
+	if (error) throw error;
+
+	return (data || []).filter((sale) => {
+		if (!sale.location?.latitude || !sale.location?.longitude) return false;
+		const km = calculateDistance(
+			{ latitude: lat, longitude: lng },
+			{ latitude: sale.location.latitude, longitude: sale.location.longitude }
+		);
+		return km <= radiusKm;
+	});
+}
+
+export async function getMySales(userId: string) {
+	const { data, error } = await supabase
+		.from("garage_sales")
+		.select("*")
+		.eq("user_id", userId)
+		.order("created_at", { ascending: false });
+
+	if (error) throw error;
+	return data;
+}
+
+export const deleteSale = async (saleId: string) => {
+	const { error } = await supabase
+		.from("garage_sales")
+		.update({ is_active: false })
+		.eq("id", saleId);
+
+	if (error) {
+		console.error("Soft delete failed:", error);
+		throw error;
+	}
+};

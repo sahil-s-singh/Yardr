@@ -1,16 +1,20 @@
-import { useState, useEffect, useRef } from 'react';
+import GradientBackground from "@/components/ui/GradientBackground";
+import { garageSaleService } from "@/services/garageSaleService";
+import { GarageSale } from "@/types/garageSale";
+import { MaterialIcons } from "@expo/vector-icons";
+import { ResizeMode, Video } from "expo-av";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import { LinearGradient } from "expo-linear-gradient";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import { garageSaleService } from '@/services/garageSaleService';
-import { GarageSale } from '@/types/garageSale';
-import { Video, ResizeMode } from 'expo-av';
+    Alert,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
 
 export default function AddVideoScreen() {
   const { id } = useLocalSearchParams();
@@ -42,29 +46,20 @@ export default function AddVideoScreen() {
     }
   };
 
-  const startRecording = async () => {
-    if (!cameraRef.current || !isCameraReady) {
-      Alert.alert('Camera Not Ready', 'Please wait for the camera to initialize');
-      return;
-    }
+	const startRecording = async () => {
+		if (!cameraRef.current || !isCameraReady) return;
 
-    try {
-      setIsRecording(true);
-
-      const video = await cameraRef.current.recordAsync({
-        maxDuration: 5,
-      });
-
-      if (video) {
-        setVideoUri(video.uri);
-      }
-      setIsRecording(false);
-    } catch (error) {
-      console.error('Error recording video:', error);
-      Alert.alert('Error', 'Failed to record video');
-      setIsRecording(false);
-    }
-  };
+		try {
+			setIsRecording(true);
+			const video = await cameraRef.current.recordAsync({ maxDuration: 5 });
+			if (video) setVideoUri(video.uri);
+			setIsRecording(false);
+		} catch (error) {
+			console.error("Error recording video:", error);
+			Alert.alert("Error", "Failed to record video");
+			setIsRecording(false);
+		}
+	};
 
   const stopRecording = () => {
     if (cameraRef.current && isRecording) {
@@ -72,299 +67,326 @@ export default function AddVideoScreen() {
     }
   };
 
-  const retakeVideo = () => {
-    setVideoUri(null);
-  };
+	const uploadVideo = async () => {
+		if (!videoUri) return;
 
-  const uploadVideo = async () => {
-    if (!videoUri) return;
+		setUploading(true);
+		try {
+			await garageSaleService.updateGarageSale(id as string, {
+				videoUrl: videoUri,
+			});
+			Alert.alert("Success", "Video has been added to your garage sale!", [
+				{ text: "OK", onPress: () => router.back() },
+			]);
+		} catch (error) {
+			console.error("Error uploading video:", error);
+			Alert.alert("Error", "Failed to save video");
+		} finally {
+			setUploading(false);
+		}
+	};
 
-    setUploading(true);
-    try {
-      // For now, save the local video URI to the database
-      // In production, you'd upload to cloud storage (Supabase Storage) first
-      // and save the cloud URL instead
-      await garageSaleService.updateGarageSale(id as string, {
-        videoUrl: videoUri,
-      });
+	// Permission screen
+	if (!permission || !permission.granted) {
+		return (
+			<SafeAreaView style={styles.safe}>
+				<GradientBackground />
+				<View style={styles.header}>
+					<TouchableOpacity onPress={() => router.back()}>
+						<Text style={styles.backChevron}>{"\u2039"}</Text>
+					</TouchableOpacity>
+					<Text style={styles.headerTitle}>Add Video</Text>
+					<View style={{ width: 20 }} />
+				</View>
+				<View style={styles.permissionWrap}>
+					<MaterialIcons name="videocam-off" size={48} color="#807A73" />
+					<Text style={styles.permissionTitle}>Camera Access Needed</Text>
+					<Text style={styles.permissionSub}>
+						We need camera permission to record a video of your sale items.
+					</Text>
+					<TouchableOpacity
+						style={styles.permissionBtn}
+						onPress={requestPermission}
+					>
+						<Text style={styles.permissionBtnText}>Allow Camera</Text>
+					</TouchableOpacity>
+					<TouchableOpacity onPress={() => router.back()}>
+						<Text style={styles.skipText}>Skip for Now</Text>
+					</TouchableOpacity>
+				</View>
+			</SafeAreaView>
+		);
+	}
 
-      Alert.alert(
-        'Success',
-        'Video has been added to your garage sale!',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]
-      );
-    } catch (error) {
-      console.error('Error uploading video:', error);
-      Alert.alert('Error', 'Failed to save video');
-    } finally {
-      setUploading(false);
-    }
-  };
+	// Preview screen
+	if (videoUri) {
+		return (
+			<View style={styles.container}>
+				<Video
+					source={{ uri: videoUri }}
+					style={StyleSheet.absoluteFill}
+					resizeMode={ResizeMode.COVER}
+					isLooping
+					shouldPlay
+				/>
 
-  if (!permission) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.text}>Requesting camera permission...</Text>
-      </View>
-    );
-  }
+				<SafeAreaView style={styles.previewOverlay}>
+					<View style={styles.header}>
+						<TouchableOpacity onPress={() => setVideoUri(null)}>
+							<Text style={[styles.backChevron, { color: "#fff" }]}>
+								{"\u2039"}
+							</Text>
+						</TouchableOpacity>
+						<Text style={[styles.headerTitle, { color: "#fff" }]}>
+							Preview
+						</Text>
+						<View style={{ width: 20 }} />
+					</View>
+				</SafeAreaView>
 
-  if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.permissionContainer}>
-          <Text style={styles.permissionText}>
-            Camera access is required to record a video of your garage sale
-          </Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-            <Text style={styles.permissionButtonText}>Grant Permission</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.skipButton} onPress={() => router.back()}>
-            <Text style={styles.skipButtonText}>Skip for Now</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+				<View style={styles.previewControls}>
+					<TouchableOpacity
+						style={styles.retakeBtn}
+						onPress={() => setVideoUri(null)}
+					>
+						<Text style={styles.retakeBtnText}>Retake</Text>
+					</TouchableOpacity>
+					<TouchableOpacity
+						onPress={uploadVideo}
+						disabled={uploading}
+						activeOpacity={0.9}
+						style={{ flex: 1 }}
+					>
+						<LinearGradient
+							colors={["#DF6B4F", "#F9AD85"]}
+							start={{ x: 0, y: 0.5 }}
+							end={{ x: 1, y: 0.5 }}
+							style={[styles.uploadBtn, uploading && { opacity: 0.5 }]}
+						>
+							<Text style={styles.uploadBtnText}>
+								{uploading ? "Uploading..." : "Upload Video"}
+							</Text>
+						</LinearGradient>
+					</TouchableOpacity>
+				</View>
+			</View>
+		);
+	}
 
-  if (videoUri) {
-    return (
-      <View style={styles.container}>
-        <Video
-          source={{ uri: videoUri }}
-          style={styles.video}
-          resizeMode={ResizeMode.COVER}
-          isLooping
-          shouldPlay
-        />
+	// Camera screen
+	return (
+		<SafeAreaView style={styles.safe}>
+			<GradientBackground />
 
-        <View style={styles.previewControls}>
-          <TouchableOpacity style={styles.retakeButton} onPress={retakeVideo}>
-            <Text style={styles.retakeButtonText}>Retake</Text>
-          </TouchableOpacity>
+			<View style={styles.header}>
+				<TouchableOpacity onPress={() => router.back()}>
+					<Text style={styles.backChevron}>{"\u2039"}</Text>
+				</TouchableOpacity>
+				<Text style={styles.headerTitle}>Add Video</Text>
+				<View style={{ width: 20 }} />
+			</View>
 
-          <TouchableOpacity
-            style={[styles.uploadButton, uploading && styles.buttonDisabled]}
-            onPress={uploadVideo}
-            disabled={uploading}
-          >
-            <Text style={styles.uploadButtonText}>
-              {uploading ? 'Uploading...' : 'Upload Video'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+			<View style={styles.cameraWrap}>
+				<CameraView
+					ref={cameraRef}
+					style={StyleSheet.absoluteFill}
+					facing="back"
+					mode="video"
+					onCameraReady={() => setIsCameraReady(true)}
+				/>
 
-  return (
-    <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        style={styles.camera}
-        facing="back"
-        mode="video"
-        onCameraReady={() => setIsCameraReady(true)}
-      >
-        <View style={styles.overlay}>
-          <Text style={styles.instructions}>
-            {!isCameraReady
-              ? 'Camera initializing...'
-              : isRecording
-              ? 'Recording... (5 seconds max)'
-              : '📹 Record a 5-second video of your garage sale'}
-          </Text>
+				{/* Corner brackets */}
+				<View style={[styles.corner, styles.cornerTL]} />
+				<View style={[styles.corner, styles.cornerTR]} />
+				<View style={[styles.corner, styles.cornerBL]} />
+				<View style={[styles.corner, styles.cornerBR]} />
 
-          {!isRecording && isCameraReady && (
-            <Text style={styles.subInstructions}>
-              Show items, setup, or anything that helps buyers see what you're selling!
-            </Text>
-          )}
+				{!isCameraReady && (
+					<Text style={styles.cameraHint}>Initializing camera...</Text>
+				)}
+			</View>
 
-          <View style={styles.controls}>
-            {!isRecording ? (
-              <>
-                <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.recordButton, !isCameraReady && styles.buttonDisabled]}
-                  onPress={startRecording}
-                  disabled={!isCameraReady}
-                >
-                  <View style={styles.recordButtonInner} />
-                </TouchableOpacity>
-
-                <View style={styles.placeholder} />
-              </>
-            ) : (
-              <>
-                <View style={styles.placeholder} />
-                <TouchableOpacity style={styles.stopButton} onPress={stopRecording}>
-                  <View style={styles.stopButtonInner} />
-                </TouchableOpacity>
-                <View style={styles.placeholder} />
-              </>
-            )}
-          </View>
-        </View>
-      </CameraView>
-    </View>
-  );
+			<View style={styles.controls}>
+				<View style={{ width: 44 }} />
+				<TouchableOpacity
+					style={styles.recordOuter}
+					onPress={isRecording ? stopRecording : startRecording}
+					disabled={!isCameraReady}
+					activeOpacity={0.85}
+				>
+					<View
+						style={[
+							styles.recordInner,
+							isRecording && styles.recordStop,
+							!isCameraReady && { opacity: 0.4 },
+						]}
+					/>
+				</TouchableOpacity>
+				<View style={{ width: 44 }} />
+			</View>
+		</SafeAreaView>
+	);
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  text: {
-    color: '#fff',
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 50,
-  },
-  permissionContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  permissionText: {
-    color: '#fff',
-    fontSize: 18,
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  permissionButton: {
-    backgroundColor: '#0066FF',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  permissionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  skipButton: {
-    padding: 12,
-  },
-  skipButtonText: {
-    color: '#999',
-    fontSize: 14,
-  },
-  camera: {
-    flex: 1,
-  },
-  video: {
-    flex: 1,
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingBottom: 40,
-  },
-  instructions: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  subInstructions: {
-    color: '#fff',
-    fontSize: 14,
-    textAlign: 'center',
-    paddingHorizontal: 30,
-    marginTop: 10,
-  },
-  controls: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  recordButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  recordButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FF3B30',
-  },
-  stopButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stopButtonInner: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#FF3B30',
-  },
-  cancelButton: {
-    padding: 12,
-  },
-  cancelButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  placeholder: {
-    width: 60,
-  },
-  previewControls: {
-    position: 'absolute',
-    bottom: 40,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  retakeButton: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  retakeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  uploadButton: {
-    flex: 1,
-    backgroundColor: '#0066FF',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  uploadButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
+	safe: { flex: 1, backgroundColor: "#F7F6F4" },
+	container: { flex: 1, backgroundColor: "#000" },
+
+	header: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingHorizontal: 16,
+		paddingVertical: 8,
+	},
+	backChevron: {
+		fontSize: 28,
+		fontWeight: "700",
+		color: "#23201C",
+	},
+	headerTitle: {
+		flex: 1,
+		textAlign: "center",
+		fontSize: 18,
+		fontWeight: "700",
+		color: "#23201C",
+	},
+
+	cameraWrap: {
+		flex: 1,
+		marginHorizontal: 16,
+		borderRadius: 24,
+		overflow: "hidden",
+		backgroundColor: "#1A1A1C",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	cameraHint: {
+		color: "#737373",
+		fontSize: 15,
+	},
+
+	corner: {
+		position: "absolute",
+		width: 32,
+		height: 32,
+		borderColor: "rgba(255,255,255,0.2)",
+	},
+	cornerTL: { top: 24, left: 24, borderTopWidth: 2, borderLeftWidth: 2 },
+	cornerTR: { top: 24, right: 24, borderTopWidth: 2, borderRightWidth: 2 },
+	cornerBL: {
+		bottom: 24,
+		left: 24,
+		borderBottomWidth: 2,
+		borderLeftWidth: 2,
+	},
+	cornerBR: {
+		bottom: 24,
+		right: 24,
+		borderBottomWidth: 2,
+		borderRightWidth: 2,
+	},
+
+	controls: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 20,
+		paddingBottom: 30,
+		gap: 50,
+	},
+	recordOuter: {
+		width: 72,
+		height: 72,
+		borderRadius: 36,
+		borderWidth: 3,
+		borderColor: "rgba(223,107,79,0.3)",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	recordInner: {
+		width: 52,
+		height: 52,
+		borderRadius: 26,
+		backgroundColor: "#DF6B4F",
+	},
+	recordStop: {
+		borderRadius: 8,
+		width: 32,
+		height: 32,
+		backgroundColor: "#E05244",
+	},
+
+	permissionWrap: {
+		flex: 1,
+		alignItems: "center",
+		justifyContent: "center",
+		paddingHorizontal: 40,
+	},
+	permissionTitle: {
+		fontSize: 20,
+		fontWeight: "700",
+		color: "#23201C",
+		marginTop: 16,
+	},
+	permissionSub: {
+		fontSize: 15,
+		color: "#807A73",
+		textAlign: "center",
+		marginTop: 8,
+		lineHeight: 22,
+	},
+	permissionBtn: {
+		marginTop: 24,
+		backgroundColor: "#DF6B4F",
+		borderRadius: 18,
+		paddingVertical: 14,
+		paddingHorizontal: 28,
+	},
+	permissionBtnText: {
+		color: "#fff",
+		fontSize: 16,
+		fontWeight: "700",
+	},
+	skipText: {
+		color: "#807A73",
+		fontSize: 14,
+		marginTop: 12,
+	},
+
+	previewOverlay: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+	},
+	previewControls: {
+		position: "absolute",
+		bottom: 40,
+		left: 20,
+		right: 20,
+		flexDirection: "row",
+		gap: 12,
+	},
+	retakeBtn: {
+		flex: 1,
+		backgroundColor: "rgba(255,255,255,0.2)",
+		padding: 16,
+		borderRadius: 18,
+		alignItems: "center",
+	},
+	retakeBtnText: {
+		color: "#fff",
+		fontSize: 16,
+		fontWeight: "700",
+	},
+	uploadBtn: {
+		padding: 16,
+		borderRadius: 18,
+		alignItems: "center",
+	},
+	uploadBtnText: {
+		color: "#fff",
+		fontSize: 16,
+		fontWeight: "700",
+	},
 });
