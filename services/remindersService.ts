@@ -66,7 +66,10 @@ export const remindersService = {
           body: `${garageSaleTitle} is happening soon!`,
           data: { garageSaleId },
         },
-        trigger: reminderTime,
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: reminderTime,
+        },
       });
     } catch (notifError) {
       console.error('Error scheduling notification:', notifError);

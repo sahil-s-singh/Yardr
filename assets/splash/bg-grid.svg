@@ -1,0 +1,17 @@
+<svg  overflow="visible" viewBox="0 0 390 844" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Frame" clip-path="url(#clip0_0_137)">
+<path id="Vector" opacity="0.7" d="M0 180H390" stroke="#FFE8D6" stroke-width="3" stroke-dasharray="6 8"/>
+<path id="Vector_2" opacity="0.7" d="M0 340H390" stroke="#FFE8D6" stroke-width="3" stroke-dasharray="6 8"/>
+<path id="Vector_3" opacity="0.7" d="M0 500H390" stroke="#FFE8D6" stroke-width="3" stroke-dasharray="6 8"/>
+<path id="Vector_4" opacity="0.7" d="M0 660H390" stroke="#FFE8D6" stroke-width="3" stroke-dasharray="6 8"/>
+<path id="Vector_5" opacity="0.7" d="M80 0V844" stroke="#FFE8D6" stroke-width="3" stroke-dasharray="6 8"/>
+<path id="Vector_6" opacity="0.7" d="M195 0V844" stroke="#FFE8D6" stroke-width="3" stroke-dasharray="6 8"/>
+<path id="Vector_7" opacity="0.7" d="M310 0V844" stroke="#FFE8D6" stroke-width="3" stroke-dasharray="6 8"/>
+<path id="Vector_8" opacity="0.5" d="M60 120C80 140 120 160 160 150C200 140 220 180 260 200C300 220 320 280 280 320C240 360 180 340 160 380C140 420 180 460 220 480C260 500 300 540 280 580C260 620 200 620 180 660C160 700 200 740 260 750" stroke="#E0734E" stroke-width="4" stroke-linecap="round" stroke-dasharray="3 10"/>
+</g>
+<defs>
+<clipPath id="clip0_0_137">
+<rect width="390" height="844" fill="white"/>
+</clipPath>
+</defs>
+</svg>
