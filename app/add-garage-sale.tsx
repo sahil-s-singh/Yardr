@@ -1,17 +1,17 @@
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import VideoRecorder from '@/components/VideoRecorder';
-import { useAuth } from '@/contexts/AuthContext';
-import { analyzeGarageSaleVideo } from '@/lib/claude';
-import { garageSaleService } from '@/services/garageSaleService';
-import { rateLimitService } from '@/services/rateLimitService';
-import { videoService } from '@/services/videoService';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { EncodingType, readAsStringAsync } from 'expo-file-system/legacy';
-import * as Location from 'expo-location';
-import { router } from 'expo-router';
-import * as VideoThumbnails from 'expo-video-thumbnails';
-import { useRef, useState } from 'react';
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import VideoRecorder from "@/components/VideoRecorder";
+import { useAuth } from "@/contexts/AuthContext";
+import { analyzeGarageSaleVideo } from "@/lib/claude";
+import { garageSaleService } from "@/services/garageSaleService";
+import { rateLimitService } from "@/services/rateLimitService";
+import { videoService } from "@/services/videoService";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { EncodingType, readAsStringAsync } from "expo-file-system/legacy";
+import * as Location from "expo-location";
+import { router } from "expo-router";
+import * as VideoThumbnails from "expo-video-thumbnails";
+import { useRef, useState } from "react";
 import {
 	Alert,
 	Platform,
@@ -20,7 +20,7 @@ import {
 	TextInput,
 	TouchableOpacity,
 	View,
-} from 'react-native';
+} from "react-native";
 // import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 // import { GOOGLE_MAPS_API_KEY } from '@/constants/config';
 
@@ -108,7 +108,7 @@ export default function AddGarageSaleScreen() {
 									};
 								}
 							} catch (error) {
-								console.log("Error reverse geocoding:", error);
+								console.error("Error reverse geocoding:", error);
 							}
 							return null;
 						})
@@ -129,7 +129,7 @@ export default function AddGarageSaleScreen() {
 					setShowSuggestions(false);
 				}
 			} catch (error) {
-				console.log("Error geocoding:", error);
+				console.error("Error geocoding:", error);
 				setAddressSuggestions([]);
 				setShowSuggestions(false);
 			}
@@ -147,7 +147,6 @@ export default function AddGarageSaleScreen() {
 		setAnalyzing(true);
 
 		try {
-			console.log("Video recorded:", recordedVideoUri);
 
 			// Step 1: Get current location and reverse geocode to address
 			let address = "";
@@ -158,7 +157,7 @@ export default function AddGarageSaleScreen() {
 				const { status } = await Location.requestForegroundPermissionsAsync();
 				if (status === "granted") {
 					const location = await Location.getCurrentPositionAsync({});
-					console.log("Got location:", location.coords);
+
 
 					// Save location for later use
 					currentLocation = {
@@ -171,7 +170,7 @@ export default function AddGarageSaleScreen() {
 						longitude: location.coords.longitude,
 					});
 
-					console.log("Reverse geocode result:", reverseGeocode);
+
 
 					if (reverseGeocode.length > 0) {
 						const addr = reverseGeocode[0];
@@ -193,7 +192,7 @@ export default function AddGarageSaleScreen() {
 							address = streetAddress;
 						}
 
-						console.log("Formatted address:", address);
+
 					}
 				}
 			} catch (locationError) {
@@ -220,7 +219,7 @@ export default function AddGarageSaleScreen() {
 			let analysis;
 			try {
 				analysis = await analyzeGarageSaleVideo(base64Frames);
-				console.log("AI Analysis:", analysis);
+
 			} catch (aiError) {
 				console.error("AI analysis failed:", aiError);
 				// Use default values if AI fails

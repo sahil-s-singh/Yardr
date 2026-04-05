@@ -3,16 +3,20 @@ import GradientBackground from "@/components/ui/GradientBackground";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { getMySales } from "@/services/garageSaleService";
+import { deleteSale, getMySales } from "@/services/garageSaleService";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View
-} from 'react-native';
+	Alert,
+	Image,
+	SafeAreaView,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
+} from "react-native";
 
 export default function MySalesScreen() {
 	const { user } = useAuth();
@@ -41,10 +45,19 @@ export default function MySalesScreen() {
 		}, [user])
 	);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    loadMySales();
-  };
+	const confirmDelete = (id: string) => {
+		Alert.alert("Delete Sale", "This action cannot be undone.", [
+			{ text: "Cancel", style: "cancel" },
+			{
+				text: "Delete",
+				style: "destructive",
+				onPress: async () => {
+					await deleteSale(id);
+					setSales((prev) => prev.filter((s) => s.id !== id));
+				},
+			},
+		]);
+	};
 
 	if (!user) return null;
 

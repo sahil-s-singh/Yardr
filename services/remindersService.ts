@@ -1,7 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import * as Notifications from 'expo-notifications';
 import { UserReminder } from '@/types/user';
-import { mapGarageSaleRow } from '@/lib/mappers';
 
 export const remindersService = {
   /**
@@ -58,19 +57,25 @@ export const remindersService = {
 
     if (error) throw error;
 
-    // Schedule local notification
+    // Schedule local notification as a fallback
     try {
-      await Notifications.scheduleNotificationAsync({
+      const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
-          title: 'Garage Sale Reminder 🏷️',
+          title: 'Garage Sale Reminder',
           body: `${garageSaleTitle} is happening soon!`,
-          data: { garageSaleId },
+          data: { type: 'reminder', garageSaleId },
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: reminderTime,
         },
       });
+
+      // Store notification ID so we can cancel it later
+      await supabase
+        .from('user_reminders')
+        .update({ local_notification_id: notificationId })
+        .eq('id', data.id);
     } catch (notifError) {
       console.error('Error scheduling notification:', notifError);
       // Don't throw - the reminder is still saved in the database
@@ -83,6 +88,23 @@ export const remindersService = {
    * Remove a reminder
    */
   removeReminder: async (userId: string, garageSaleId: string): Promise<void> => {
+    // Fetch the reminder first to get the local notification ID
+    const { data: reminder } = await supabase
+      .from('user_reminders')
+      .select('local_notification_id')
+      .eq('user_id', userId)
+      .eq('garage_sale_id', garageSaleId)
+      .maybeSingle();
+
+    // Cancel the local notification if we have its ID
+    if (reminder?.local_notification_id) {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(reminder.local_notification_id);
+      } catch (cancelError) {
+        console.error('Error cancelling notification:', cancelError);
+      }
+    }
+
     const { error } = await supabase
       .from('user_reminders')
       .delete()
@@ -90,10 +112,6 @@ export const remindersService = {
       .eq('garage_sale_id', garageSaleId);
 
     if (error) throw error;
-
-    // Note: We don't cancel the local notification here because we'd need to track
-    // the notification ID. In a production app, you'd want to store the notification ID
-    // and cancel it here.
   },
 
   /**
@@ -144,7 +162,32 @@ export const remindersService = {
         expo_push_token: reminder.expo_push_token,
         created_at: reminder.created_at,
       } as UserReminder,
-      garageSale: reminder.garage_sales ? mapGarageSaleRow(reminder.garage_sales) : null,
+      garageSale: reminder.garage_sales
+        ? {
+            id: reminder.garage_sales.id,
+            title: reminder.garage_sales.title,
+            description: reminder.garage_sales.description,
+            location: {
+              latitude: reminder.garage_sales.latitude,
+              longitude: reminder.garage_sales.longitude,
+              address: reminder.garage_sales.address,
+            },
+            date: reminder.garage_sales.date,
+            startDate: reminder.garage_sales.start_date || reminder.garage_sales.date,
+            endDate: reminder.garage_sales.end_date || reminder.garage_sales.date,
+            startTime: reminder.garage_sales.start_time,
+            endTime: reminder.garage_sales.end_time,
+            categories: reminder.garage_sales.categories || [],
+            contactName: reminder.garage_sales.contact_name,
+            contactPhone: reminder.garage_sales.contact_phone,
+            contactEmail: reminder.garage_sales.contact_email,
+            images: reminder.garage_sales.images || [],
+            videoUrl: reminder.garage_sales.video_url,
+            createdAt: reminder.garage_sales.created_at,
+            isActive: reminder.garage_sales.is_active,
+            userId: reminder.garage_sales.user_id,
+          }
+        : null,
     }));
   },
 

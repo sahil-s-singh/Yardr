@@ -1,23 +1,25 @@
 // app/tabs/profile.tsx
 
+import GradientBackground from "@/components/ui/GradientBackground";
 import ProfileAuthSheet from "@/components/profile/ProfileAuthSheet";
 import ProfileSignupSheet from "@/components/profile/ProfileSignupSheet";
-import GradientBackground from "@/components/ui/GradientBackground";
 import { Accent, Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { favoritesService } from "@/services/favoritesService";
 import { getMySales } from "@/services/garageSaleService";
+import { remindersService } from "@/services/remindersService";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    Alert,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+	Alert,
+	SafeAreaView,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
 } from "react-native";
 
 const showComingSoon = (feature: string) => {
@@ -48,20 +50,28 @@ export default function ProfileScreen() {
 	const [showLogin, setShowLogin] = useState(false);
 	const [showSignup, setShowSignup] = useState(false);
 	const [salesCount, setSalesCount] = useState(0);
+	const [savedCount, setSavedCount] = useState(0);
+	const [remindersCount, setRemindersCount] = useState(0);
 
 	useFocusEffect(
 		useCallback(() => {
 			if (user) {
-				const loadSalesCount = async () => {
+				const loadCounts = async () => {
 					try {
-						const sales = await getMySales(user.id);
+						const [sales, favs, reminders] = await Promise.all([
+							getMySales(user.id),
+							favoritesService.getFavoritesCount(user.id).catch(() => 0),
+							remindersService.getRemindersCount(user.id).catch(() => 0),
+						]);
 						setSalesCount(sales?.length || 0);
+						setSavedCount(favs);
+						setRemindersCount(reminders);
 					} catch (error) {
-						console.error("Error loading sales count:", error);
+						console.error("Error loading profile counts:", error);
 						setSalesCount(0);
 					}
 				};
-				loadSalesCount();
+				loadCounts();
 			}
 		}, [user])
 	);
@@ -121,8 +131,8 @@ export default function ProfileScreen() {
 	// LOGGED IN
 	const stats = [
 		{ label: "Sales", value: String(salesCount), icon: "style" as const, color: theme.tint },
-		{ label: "Saved", value: "12", icon: "favorite" as const, color: Accent.sage },
-		{ label: "Visits", value: "28", icon: "visibility" as const, color: Accent.indigo },
+		{ label: "Saved", value: String(savedCount), icon: "favorite" as const, color: Accent.sage },
+		{ label: "Reminders", value: String(remindersCount), icon: "notifications" as const, color: Accent.indigo },
 	];
 
 	return (

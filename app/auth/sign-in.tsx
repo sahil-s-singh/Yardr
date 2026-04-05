@@ -3,20 +3,21 @@ import GradientBackground from "@/components/ui/GradientBackground";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { authService } from "@/services/authService";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+	Alert,
+	KeyboardAvoidingView,
+	Platform,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TextInput,
+	TouchableOpacity,
+	View,
+} from "react-native";
 
 export default function SignInScreen() {
 	const [email, setEmail] = useState("");
@@ -26,6 +27,22 @@ export default function SignInScreen() {
 	const { signIn } = useAuth();
 	const colorScheme = useColorScheme();
 	const theme = Colors[colorScheme ?? "light"];
+
+	const handleForgotPassword = async () => {
+		if (!email.trim()) {
+			Alert.alert("Enter Email", "Please enter your email address first, then tap Forgot Password.");
+			return;
+		}
+		try {
+			await authService.resetPassword(email.trim());
+			Alert.alert(
+				"Check Your Email",
+				"If an account exists with that email, we've sent password reset instructions."
+			);
+		} catch (error: any) {
+			Alert.alert("Error", error.message || "Failed to send reset email");
+		}
+	};
 
 	const handleSignIn = async () => {
 		if (!email || !password) {
@@ -125,7 +142,7 @@ export default function SignInScreen() {
 							</View>
 						</View>
 
-						<TouchableOpacity>
+						<TouchableOpacity onPress={handleForgotPassword}>
 							<Text style={[styles.forgotText, { color: theme.tint }]}>
 								Forgot Password?
 							</Text>

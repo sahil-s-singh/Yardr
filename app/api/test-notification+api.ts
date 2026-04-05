@@ -1,5 +1,7 @@
+import { supabase } from '@/lib/supabase';
+
 /**
- * API endpoint to send test push notifications
+ * API endpoint to send test push notifications (dev only)
  *
  * POST /api/test-notification
  * Body: {
@@ -10,7 +12,33 @@
  * }
  */
 export async function POST(request: Request): Promise<Response> {
+  // Block in production
+  if (process.env.NODE_ENV === 'production') {
+    return new Response(
+      JSON.stringify({ error: 'Not available in production' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
+    // Verify the request comes from an authenticated user
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     let body;
     try {
       body = await request.json();
@@ -23,10 +51,11 @@ export async function POST(request: Request): Promise<Response> {
 
     const { userId, pushToken, title, body: notificationBody } = body;
 
-    if (!userId) {
+    // Users can only send test notifications to themselves
+    if (!userId || userId !== user.id) {
       return new Response(
-        JSON.stringify({ error: 'userId is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'You can only send test notifications to yourself' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
@@ -34,12 +63,6 @@ export async function POST(request: Request): Promise<Response> {
 
     // If no token provided, fetch from database
     if (!token) {
-      const { createClient } = require('@supabase/supabase-js');
-      const supabase = createClient(
-        'https://gfkqmaupmuhxavkfyjbb.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdma3FtYXVwbXVoeGF2a2Z5amJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzMTA5ODksImV4cCI6MjA4MDg4Njk4OX0.f_4aHwLdkZdaFoJwZO34TEWh664FpcmaDV1RkM-Vkuk'
-      );
-
       const { data: profile, error } = await supabase
         .from('user_profiles')
         .select('expo_push_token')

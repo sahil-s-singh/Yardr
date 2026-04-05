@@ -1,28 +1,29 @@
 import GradientBackground from "@/components/ui/GradientBackground";
 import { garageSaleService } from "@/services/garageSaleService";
+import { recheckSaleAgainstWishlists } from "@/services/matchUpdateService";
 import { GarageSale } from "@/types/garageSale";
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+	Alert,
+	KeyboardAvoidingView,
+	Platform,
+	SafeAreaView,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TextInput,
+	TouchableOpacity,
+	View,
 } from "react-native";
 
 export default function EditSaleScreen() {
-  const { id } = useLocalSearchParams();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [sale, setSale] = useState<GarageSale | null>(null);
+	const { id } = useLocalSearchParams();
+	const [loading, setLoading] = useState(true);
+	const [saving, setSaving] = useState(false);
+	const [sale, setSale] = useState<GarageSale | null>(null);
 
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
@@ -34,72 +35,92 @@ export default function EditSaleScreen() {
 	const [contactPhone, setContactPhone] = useState("");
 	const [contactEmail, setContactEmail] = useState("");
 
-  useEffect(() => {
-    loadSale();
-  }, [id]);
+	useEffect(() => {
+		loadSale();
+	}, [id]);
 
-  const loadSale = async () => {
-    try {
-      const saleData = await garageSaleService.getGarageSaleById(id as string);
-      if (saleData) {
-        setSale(saleData);
-        setTitle(saleData.title);
-        setDescription(saleData.description);
-        setContactName(saleData.contactName);
-        setContactPhone(saleData.contactPhone || '');
-        setContactEmail(saleData.contactEmail || '');
-      } else {
-        Alert.alert('Error', 'Garage sale not found');
-        router.back();
-      }
-    } catch (error) {
-      console.error('Error loading sale:', error);
-      Alert.alert('Error', 'Failed to load garage sale');
-      router.back();
-    } finally {
-      setLoading(false);
-    }
-  };
+	const loadSale = async () => {
+		try {
+			const saleData = await garageSaleService.getGarageSaleById(id as string);
+			if (saleData) {
+				setSale(saleData);
+				setTitle(saleData.title);
+				setDescription(saleData.description);
+				setAddress(saleData.location?.address || "");
+				setDate(saleData.date);
+				setStartTime(saleData.startTime);
+				setEndTime(saleData.endTime);
+				setContactName(saleData.contactName);
+				setContactPhone(saleData.contactPhone || "");
+				setContactEmail(saleData.contactEmail || "");
+			} else {
+				Alert.alert("Error", "Garage sale not found");
+				router.back();
+			}
+		} catch (error) {
+			console.error("Error loading sale:", error);
+			Alert.alert("Error", "Failed to load garage sale");
+			router.back();
+		} finally {
+			setLoading(false);
+		}
+	};
 
-  const handleSave = async () => {
-    if (!title.trim() || !description.trim() || !contactName.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
+	const handleDelete = () => {
+		Alert.alert(
+			"Delete Sale",
+			"Are you sure you want to delete this garage sale?",
+			[
+				{ text: "Cancel", style: "cancel" },
+				{
+					text: "Delete",
+					style: "destructive",
+					onPress: async () => {
+						try {
+							await garageSaleService.deleteGarageSale(id as string);
+							Alert.alert("Success", "Garage sale deleted", [
+								{ text: "OK", onPress: () => router.push("/my-sales") },
+							]);
+						} catch (error) {
+							Alert.alert("Error", "Failed to delete garage sale");
+						}
+					},
+				},
+			]
+		);
+	};
 
-    setSaving(true);
-    try {
-      await garageSaleService.updateGarageSale(id as string, {
-        title: title.trim(),
-        description: description.trim(),
-        contactName: contactName.trim(),
-        contactPhone: contactPhone.trim() || undefined,
-        contactEmail: contactEmail.trim() || undefined,
-      });
+	const handleSave = async () => {
+		if (!title.trim() || !description.trim() || !contactName.trim()) {
+			Alert.alert("Error", "Please fill in all required fields");
+			return;
+		}
 
-      Alert.alert('Success', 'Garage sale updated successfully!', [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
-      ]);
-    } catch (error) {
-      console.error('Error updating sale:', error);
-      Alert.alert('Error', 'Failed to update garage sale');
-    } finally {
-      setSaving(false);
-    }
-  };
+		setSaving(true);
+		try {
+			await garageSaleService.updateGarageSale(id as string, {
+				title: title.trim(),
+				description: description.trim(),
+				contactName: contactName.trim(),
+				contactPhone: contactPhone.trim() || undefined,
+				contactEmail: contactEmail.trim() || undefined,
+			});
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.content}>
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
-      </View>
-    );
-  }
+			// Re-check against wishlists since title/description may have changed
+			recheckSaleAgainstWishlists(id as string).catch((err) =>
+				console.error("Wishlist recheck failed:", err)
+			);
+
+			Alert.alert("Success", "Garage sale updated successfully!", [
+				{ text: "OK", onPress: () => router.back() },
+			]);
+		} catch (error) {
+			console.error("Error updating sale:", error);
+			Alert.alert("Error", "Failed to update garage sale");
+		} finally {
+			setSaving(false);
+		}
+	};
 
 	if (loading) {
 		return (

@@ -1,7 +1,6 @@
-import { ResizeMode, Video } from "expo-av";
-import React, { useRef, useState } from "react";
+import { useVideoPlayer, VideoView } from "expo-video";
+import React, { useEffect } from "react";
 import {
-	ActivityIndicator,
 	Dimensions,
 	Modal,
 	StatusBar,
@@ -27,8 +26,15 @@ export default function StoryViewer({
 	sale,
 	onClose,
 }: StoryViewerProps) {
-	const videoRef = useRef<Video>(null);
-	const [isLoading, setIsLoading] = useState(true);
+	const player = useVideoPlayer(sale?.videoUrl ?? null, (p) => {
+		p.loop = true;
+	});
+
+	useEffect(() => {
+		if (visible && sale?.videoUrl) {
+			player.play();
+		}
+	}, [visible, sale?.videoUrl]);
 
 	if (!sale || !sale.videoUrl) {
 		return null;
@@ -49,24 +55,12 @@ export default function StoryViewer({
 				</TouchableOpacity>
 
 				{/* Video */}
-				<Video
-					ref={videoRef}
-					source={{ uri: sale.videoUrl }}
+				<VideoView
+					player={player}
 					style={styles.video}
-					resizeMode={ResizeMode.CONTAIN}
-					shouldPlay
-					isLooping
-					onLoadStart={() => setIsLoading(true)}
-					onLoad={() => setIsLoading(false)}
-					useNativeControls={false}
+					contentFit="contain"
+					nativeControls={false}
 				/>
-
-				{/* Loading Indicator */}
-				{isLoading && (
-					<View style={styles.loadingContainer}>
-						<ActivityIndicator size="large" color="#fff" />
-					</View>
-				)}
 
 				{/* Sale Info Overlay */}
 				<View style={styles.infoContainer}>
@@ -100,12 +94,6 @@ const styles = StyleSheet.create({
 	video: {
 		width,
 		height,
-	},
-	loadingContainer: {
-		...StyleSheet.absoluteFillObject,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "rgba(0, 0, 0, 0.7)",
 	},
 	infoContainer: {
 		position: "absolute",

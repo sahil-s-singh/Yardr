@@ -29,6 +29,7 @@ const CATEGORIES: GarageSaleCategory[] = [
 export default function AddWishlistItemScreen() {
   const { user } = useAuth();
   const [itemDescription, setItemDescription] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<GarageSaleCategory | undefined>(undefined);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
@@ -53,7 +54,7 @@ export default function AddWishlistItemScreen() {
         user.id,
         itemName,
         fullDescription,
-        undefined // No category selection
+        selectedCategory
       );
 
       Alert.alert(
@@ -92,6 +93,31 @@ export default function AddWishlistItemScreen() {
             placeholderTextColor="#999"
             autoFocus
           />
+        </View>
+
+        <View style={styles.formGroup}>
+          <ThemedText style={styles.categoryLabel}>Category (optional)</ThemedText>
+          <View style={styles.categoryGrid}>
+            {CATEGORIES.map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                style={[
+                  styles.categoryChip,
+                  selectedCategory === cat && styles.categoryChipSelected,
+                ]}
+                onPress={() => setSelectedCategory(selectedCategory === cat ? undefined : cat)}
+              >
+                <ThemedText
+                  style={[
+                    styles.categoryChipText,
+                    selectedCategory === cat && styles.categoryChipTextSelected,
+                  ]}
+                >
+                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                </ThemedText>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <TouchableOpacity
@@ -137,6 +163,35 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
     minHeight: 200,
     textAlignVertical: 'top',
+  },
+  categoryLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  categoryChipSelected: {
+    backgroundColor: '#0066FF',
+    borderColor: '#0066FF',
+  },
+  categoryChipText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  categoryChipTextSelected: {
+    color: '#fff',
   },
   submitButton: {
     backgroundColor: '#0066FF',

@@ -43,7 +43,18 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://gfkqmaupmuhxavkfyjbb.supabase.co/rest/v1/\" -H \"apikey: $\\(grep -o 'eyJ[^\"]*' /Users/sahil/Documents/GitHub/Yardr/lib/supabase.ts)",
       "Bash(curl -s -w '\\\\n%{http_code}' 'https://gfkqmaupmuhxavkfyjbb.supabase.co/rest/v1/garage_sales?select=id&limit=1' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdma3FtYXVwbXVoeGF2a2Z5amJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzMTA5ODksImV4cCI6MjA4MDg4Njk4OX0.f_4aHwLdkZdaFoJwZO34TEWh664FpcmaDV1RkM-Vkuk' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdma3FtYXVwbXVoeGF2a2Z5amJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzMTA5ODksImV4cCI6MjA4MDg4Njk4OX0.f_4aHwLdkZdaFoJwZO34TEWh664FpcmaDV1RkM-Vkuk')",
       "Bash(npx eas:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(find /Users/sahil/Documents/GitHub/Yardr_s -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -not -path \"*/node_modules/*\" -exec grep -l \"checkNewSaleAgainstWishlists\" {} \\\\;)",
+      "Bash(find /Users/sahil/Documents/GitHub/Yardr_s/app -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -exec grep -l \"addGarageSale\\\\|addSale\" {} \\\\;)",
+      "Bash(find /Users/sahil/Documents/GitHub/Yardr_s -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -not -path \"*/node_modules/*\" -exec grep -l \"sendWishlistMatchNotification\\\\|Notifications\\\\.\" {} \\\\;)",
+      "Bash(supabase --version)",
+      "Bash(brew install:*)",
+      "Bash(supabase init:*)",
+      "Bash(supabase link:*)",
+      "Bash(supabase login:*)",
+      "Bash(xargs basename:*)",
+      "Bash(npx jest:*)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

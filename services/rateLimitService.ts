@@ -1,14 +1,33 @@
-import * as Device from 'expo-device';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Application from "expo-application";
 
-// Rate limiting configuration
-const MAX_POSTS_PER_DAY = 999; // Temporarily disabled for testing
-const MAX_POSTS_PER_HOUR = 999; // Temporarily disabled for testing
+const DEVICE_ID_KEY = "yardr_device_id_v1";
 
-export interface RateLimitCheck {
-  allowed: boolean;
-  message?: string;
-  postsToday: number;
-  postsThisHour: number;
+async function generateFallbackId() {
+	// App-scoped ID (stable per install)
+	if (Application.applicationId) {
+		return `app:${Application.applicationId}:${Date.now()}`;
+	}
+	return `anon:${Math.random().toString(36).slice(2)}`;
+}
+
+async function getDeviceId(): Promise<string> {
+	try {
+		// 1. Try cache
+		const cached = await AsyncStorage.getItem(DEVICE_ID_KEY);
+		if (cached) return cached;
+
+		// 2. Generate new ID
+		const newId = await generateFallbackId();
+
+		// 3. Persist
+		await AsyncStorage.setItem(DEVICE_ID_KEY, newId);
+
+		return newId;
+	} catch (e) {
+		console.warn("Device ID fallback used");
+		return `temp:${Date.now()}`;
+	}
 }
 
 async function checkRateLimit(): Promise<{
@@ -43,26 +62,3 @@ export const rateLimitService = {
 	getDeviceId,
 	checkRateLimit,
 };
-
-// Helper function to get unique device identifier
-async function getDeviceId(): Promise<string> {
-  try {
-    // Try to get a unique device ID
-    const deviceId = await Device.getDeviceIdAsync();
-
-    if (deviceId) {
-      return deviceId;
-    }
-
-    // Fallback: create a composite ID from available device info
-    const deviceName = Device.deviceName || 'unknown';
-    const modelName = Device.modelName || 'unknown';
-    const osVersion = Device.osVersion || 'unknown';
-
-    return `${deviceName}-${modelName}-${osVersion}`;
-  } catch (error) {
-    console.error('Error getting device ID:', error);
-    // Ultimate fallback
-    return 'unknown-device';
-  }
-}

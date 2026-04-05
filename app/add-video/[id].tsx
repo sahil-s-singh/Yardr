@@ -1,50 +1,59 @@
 import GradientBackground from "@/components/ui/GradientBackground";
+import { analyzeGarageSaleVideo } from "@/lib/claude";
 import { garageSaleService } from "@/services/garageSaleService";
+import { videoService } from "@/services/videoService";
 import { GarageSale } from "@/types/garageSale";
 import { MaterialIcons } from "@expo/vector-icons";
-import { ResizeMode, Video } from "expo-av";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { EncodingType, readAsStringAsync } from "expo-file-system/legacy";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+	Alert,
+	SafeAreaView,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
 } from "react-native";
+import * as VideoThumbnails from "expo-video-thumbnails";
 
 export default function AddVideoScreen() {
-  const { id } = useLocalSearchParams();
-  const [permission, requestPermission] = useCameraPermissions();
-  const [isRecording, setIsRecording] = useState(false);
-  const [videoUri, setVideoUri] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [sale, setSale] = useState<GarageSale | null>(null);
-  const [isCameraReady, setIsCameraReady] = useState(false);
-  const cameraRef = useRef<CameraView>(null);
+	const { id } = useLocalSearchParams();
+	const [permission, requestPermission] = useCameraPermissions();
+	const [isRecording, setIsRecording] = useState(false);
+	const [videoUri, setVideoUri] = useState<string | null>(null);
+	const [uploading, setUploading] = useState(false);
+	const [sale, setSale] = useState<GarageSale | null>(null);
+	const [isCameraReady, setIsCameraReady] = useState(false);
+	const cameraRef = useRef<CameraView>(null);
 
-  useEffect(() => {
-    loadSale();
-  }, [id]);
+	const player = useVideoPlayer(videoUri, (p) => {
+		p.loop = true;
+		p.play();
+	});
 
-  const loadSale = async () => {
-    try {
-      const saleData = await garageSaleService.getGarageSaleById(id as string);
-      if (saleData) {
-        setSale(saleData);
-      } else {
-        Alert.alert('Error', 'Garage sale not found');
-        router.back();
-      }
-    } catch (error) {
-      console.error('Error loading sale:', error);
-      Alert.alert('Error', 'Failed to load garage sale');
-      router.back();
-    }
-  };
+	useEffect(() => {
+		loadSale();
+	}, [id]);
+
+	const loadSale = async () => {
+		try {
+			const saleData = await garageSaleService.getGarageSaleById(id as string);
+			if (saleData) {
+				setSale(saleData);
+			} else {
+				Alert.alert("Error", "Garage sale not found");
+				router.back();
+			}
+		} catch (error) {
+			console.error("Error loading sale:", error);
+			Alert.alert("Error", "Failed to load garage sale");
+			router.back();
+		}
+	};
 
 	const startRecording = async () => {
 		if (!cameraRef.current || !isCameraReady) return;
@@ -61,26 +70,62 @@ export default function AddVideoScreen() {
 		}
 	};
 
-  const stopRecording = () => {
-    if (cameraRef.current && isRecording) {
-      cameraRef.current.stopRecording();
-    }
-  };
+	const stopRecording = () => {
+		if (cameraRef.current && isRecording) {
+			cameraRef.current.stopRecording();
+		}
+	};
 
 	const uploadVideo = async () => {
 		if (!videoUri) return;
 
 		setUploading(true);
 		try {
+			// Step 1: Upload video to storage
+			const publicUrl = await videoService.uploadVideo(videoUri);
+
+			// Step 2: Extract frames and analyze with Claude AI
+			let aiUpdates: { title?: string; description?: string; categories?: string[] } = {};
+			try {
+				const thumbnailPromises = [0, 2500, 4500].map((time) =>
+					VideoThumbnails.getThumbnailAsync(videoUri, { time })
+				);
+				const thumbnails = await Promise.all(thumbnailPromises);
+
+				const base64Frames = await Promise.all(
+					thumbnails.map(async (thumbnail) => {
+						const base64 = await readAsStringAsync(thumbnail.uri, {
+							encoding: EncodingType.Base64,
+						});
+						return base64;
+					})
+				);
+
+				const analysis = await analyzeGarageSaleVideo(base64Frames);
+				aiUpdates = {
+					title: analysis.title,
+					description: analysis.description,
+					categories: analysis.categories,
+				};
+			} catch (aiError) {
+				console.error("AI analysis failed, uploading video only:", aiError);
+			}
+
+			// Step 3: Update the sale with video URL and AI insights
 			await garageSaleService.updateGarageSale(id as string, {
-				videoUrl: videoUri,
+				videoUrl: publicUrl,
+				...aiUpdates,
 			});
-			Alert.alert("Success", "Video has been added to your garage sale!", [
+
+			const message = aiUpdates.title
+				? "Video added and sale details updated with AI insights!"
+				: "Video has been added to your garage sale!";
+			Alert.alert("Success", message, [
 				{ text: "OK", onPress: () => router.back() },
 			]);
 		} catch (error) {
 			console.error("Error uploading video:", error);
-			Alert.alert("Error", "Failed to save video");
+			Alert.alert("Error", "Failed to upload video");
 		} finally {
 			setUploading(false);
 		}
@@ -122,12 +167,11 @@ export default function AddVideoScreen() {
 	if (videoUri) {
 		return (
 			<View style={styles.container}>
-				<Video
-					source={{ uri: videoUri }}
+				<VideoView
+					player={player}
 					style={StyleSheet.absoluteFill}
-					resizeMode={ResizeMode.COVER}
-					isLooping
-					shouldPlay
+					contentFit="cover"
+					nativeControls={false}
 				/>
 
 				<SafeAreaView style={styles.previewOverlay}>
