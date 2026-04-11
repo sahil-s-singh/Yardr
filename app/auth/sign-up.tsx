@@ -46,11 +46,7 @@ export default function SignUpScreen() {
 		setLoading(true);
 		try {
 			await signUp(email.trim(), password, displayName.trim() || undefined);
-			Alert.alert(
-				"Success",
-				"Account created! Please check your email to verify your account.",
-				[{ text: "OK", onPress: () => router.push("/auth/sign-in") }]
-			);
+			router.replace("/(tabs)");
 		} catch (error: any) {
 			Alert.alert(
 				"Sign Up Failed",

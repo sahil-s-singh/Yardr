@@ -1,7 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Text, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { ThemedText } from '@/components/themed-text';
 
 interface VideoRecorderProps {
@@ -15,12 +14,8 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
   const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const cameraRef = useRef<CameraView>(null);
-
-  const player = useVideoPlayer(recordedVideo, (p) => {
-    p.loop = true;
-    p.play();
-  });
 
   if (!permission) {
     return <View style={styles.container}><ThemedText>Loading...</ThemedText></View>;
@@ -37,31 +32,44 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
     );
   }
 
-  const startRecording = async () => {
-    if (!cameraRef.current) return;
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
-    try {
-      // 3-second countdown
-      for (let i = 3; i > 0; i--) {
-        setCountdown(i);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+  const startRecording = useCallback(() => {
+    if (!cameraRef.current || !cameraReady) return;
+
+    let count = 3;
+    setCountdown(count);
+
+    countdownRef.current = setInterval(() => {
+      count--;
+      if (count > 0) {
+        setCountdown(count);
+      } else {
+        // Countdown finished — start recording
+        if (countdownRef.current) clearInterval(countdownRef.current);
+        setCountdown(null);
+        setIsRecording(true);
+
+        cameraRef.current?.recordAsync({ maxDuration: 5 })
+          .then((video) => {
+            setIsRecording(false);
+            if (video) setRecordedVideo(video.uri);
+          })
+          .catch((error) => {
+            console.error('Error recording video:', error);
+            Alert.alert('Error', 'Failed to record video');
+            setIsRecording(false);
+          });
       }
-      setCountdown(null);
+    }, 1000);
+  }, [cameraReady]);
 
-      setIsRecording(true);
-
-      const video = await cameraRef.current.recordAsync({
-        maxDuration: 5,
-      });
-
-      setIsRecording(false);
-      if (video) setRecordedVideo(video.uri);
-    } catch (error) {
-      console.error('Error recording video:', error);
-      Alert.alert('Error', 'Failed to record video');
-      setIsRecording(false);
-    }
-  };
+  // Cleanup countdown on unmount
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
 
   const stopRecording = () => {
     if (cameraRef.current && isRecording) {
@@ -97,12 +105,11 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
   if (recordedVideo) {
     return (
       <View style={styles.container}>
-        <VideoView
-          player={player}
-          style={styles.video}
-          nativeControls
-          contentFit="contain"
-        />
+        <View style={styles.previewCenter}>
+          <ThemedText style={styles.previewCheck}>✓</ThemedText>
+          <ThemedText style={styles.previewTitle}>Video Recorded</ThemedText>
+          <ThemedText style={styles.previewSub}>5 second clip ready</ThemedText>
+        </View>
 
         {processing ? (
           <View style={styles.processingContainer}>
@@ -131,6 +138,7 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
         ref={cameraRef}
         facing="back"
         mode="video"
+        onCameraReady={() => setCameraReady(true)}
       >
         {countdown !== null && (
           <View style={styles.countdownContainer}>
@@ -185,8 +193,25 @@ const styles = StyleSheet.create({
   camera: {
     flex: 1,
   },
-  video: {
+  previewCenter: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewCheck: {
+    fontSize: 64,
+    color: '#4CD964',
+    marginBottom: 12,
+  },
+  previewTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  previewSub: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 6,
   },
   message: {
     textAlign: 'center',

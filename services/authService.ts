@@ -17,16 +17,21 @@ export const authService = {
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      if (error.message.includes('rate limit')) {
+        throw new Error('Too many attempts. Please wait a few minutes and try again.');
+      }
+      throw error;
+    }
 
     // Create user profile
     if (data.user) {
-      const { error: profileError } = await supabase.from('user_profiles').insert([
+      const { error: profileError } = await supabase.from('user_profiles').upsert([
         {
           id: data.user.id,
           display_name: displayName || null,
         },
-      ]);
+      ], { onConflict: 'id' });
 
       if (profileError) {
         console.error('Error creating user profile:', profileError);
