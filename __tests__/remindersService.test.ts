@@ -52,15 +52,15 @@ describe("remindersService", () => {
       );
 
       expect(result.id).toBe("r1");
-      expect(mockSchedule).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: expect.objectContaining({
-            title: "Garage Sale Reminder",
-            body: "Big Sale is happening soon!",
-            data: expect.objectContaining({ type: "reminder", garageSaleId: "s1" }),
-          }),
-        })
+      expect(mockSchedule).toHaveBeenCalledTimes(1);
+      const scheduleArg = mockSchedule.mock.calls[0][0];
+      expect(scheduleArg.content.data).toEqual(
+        expect.objectContaining({ type: "reminder", garageSaleId: "s1" }),
       );
+      // Copy is randomized per template, so just assert the sale title
+      // surfaces somewhere in the combined title/body.
+      const combined = `${scheduleArg.content.title} ${scheduleArg.content.body}`;
+      expect(combined).toContain("Big Sale");
     });
 
     it("stores local_notification_id after scheduling", async () => {

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
+import FavoriteButton from "@/components/FavoriteButton";
+import ReminderButton from "@/components/ReminderButton";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -58,8 +60,6 @@ export default function SaleCard({
 		[sale.startTime, sale.endTime]
 	);
 
-	const itemCount = (sale.categories?.length ?? 0) || 4;
-
 	const content = (
 		<>
 			<View style={styles.mediaWrap}>
@@ -90,6 +90,21 @@ export default function SaleCard({
 					</View>
 				) : null}
 
+				<View style={styles.actionsBackdrop}>
+					<FavoriteButton
+						garageSaleId={sale.id}
+						variant="floating"
+						size={22}
+					/>
+					<ReminderButton
+						garageSaleId={sale.id}
+						garageSaleTitle={sale.title}
+						garageSaleDate={dateIso}
+						variant="floating"
+						size={20}
+					/>
+				</View>
+
 				<View style={[styles.dateBadge, { backgroundColor: theme.tint }]}>
 					<Text style={styles.dateText}>{badgeText}</Text>
 				</View>
@@ -103,21 +118,6 @@ export default function SaleCard({
 				<Text style={[styles.timeText, { color: theme.secondaryText }]}>
 					{timeText}
 				</Text>
-
-				<View style={[styles.divider, { backgroundColor: theme.border }]} />
-
-				<View style={styles.itemsRow}>
-					<View
-						style={[styles.countBadge, { backgroundColor: `${theme.tint}18` }]}
-					>
-						<Text style={[styles.countText, { color: theme.tint }]}>
-							{itemCount}
-						</Text>
-					</View>
-					<Text style={[styles.itemsText, { color: theme.secondaryText }]}>
-						items for sale
-					</Text>
-				</View>
 			</View>
 		</>
 	);
@@ -172,6 +172,17 @@ const styles = StyleSheet.create({
 	},
 	distanceText: { fontSize: 12, fontWeight: "700", color: "#23201C" },
 
+	actionsBackdrop: {
+		position: "absolute",
+		top: 8,
+		left: 8,
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "rgba(255,255,255,0.9)",
+		borderRadius: 22,
+		paddingHorizontal: 2,
+	},
+
 	dateBadge: {
 		position: "absolute",
 		left: 12,
@@ -190,16 +201,5 @@ const styles = StyleSheet.create({
 		marginBottom: 6,
 	},
 
-	timeText: { fontSize: 14, fontWeight: "600", marginBottom: 10 },
-
-	divider: { height: 1, width: "100%", marginBottom: 10 },
-
-	itemsRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-	countBadge: {
-		borderRadius: 6,
-		paddingVertical: 2,
-		paddingHorizontal: 8,
-	},
-	countText: { fontSize: 14, fontWeight: "800" },
-	itemsText: { fontSize: 14, fontWeight: "600" },
+	timeText: { fontSize: 14, fontWeight: "600" },
 });

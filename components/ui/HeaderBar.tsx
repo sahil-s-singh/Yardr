@@ -9,9 +9,18 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 interface HeaderBarProps {
 	mode?: "map" | "list";
 	onToggleMode?: (mode: "map" | "list") => void;
+	wishlistActive?: boolean;
+	onToggleWishlist?: () => void;
+	wishlistCount?: number;
 }
 
-export default function HeaderBar({ mode, onToggleMode }: HeaderBarProps) {
+export default function HeaderBar({
+	mode,
+	onToggleMode,
+	wishlistActive,
+	onToggleWishlist,
+	wishlistCount,
+}: HeaderBarProps) {
 	const colorScheme = useColorScheme();
 	const theme = Colors[colorScheme ?? "light"];
 
@@ -65,23 +74,58 @@ export default function HeaderBar({ mode, onToggleMode }: HeaderBarProps) {
 				<Text style={styles.brand}>yardr</Text>
 			</View>
 
-			{/* Right — Notification bell */}
-			<TouchableOpacity style={styles.iconBtn} activeOpacity={0.8}>
-				<MaterialIcons
-					name="notifications-none"
-					size={22}
-					color={theme.secondaryText}
-				/>
-				<View
-					style={[
-						styles.badge,
-						{
-							backgroundColor: theme.tint,
-							borderColor: theme.background,
-						},
-					]}
-				/>
-			</TouchableOpacity>
+			{/* Right — Wishlist filter + Notification bell */}
+			<View style={styles.rightGroup}>
+				{onToggleWishlist ? (
+					<TouchableOpacity
+						style={[
+							styles.iconBtn,
+							wishlistActive && {
+								backgroundColor: `${theme.tint}1A`,
+								borderRadius: 10,
+							},
+						]}
+						activeOpacity={0.8}
+						onPress={onToggleWishlist}
+					>
+						<MaterialIcons
+							name="local-offer"
+							size={20}
+							color={wishlistActive ? theme.tint : theme.secondaryText}
+						/>
+						{wishlistCount && wishlistCount > 0 ? (
+							<View
+								style={[
+									styles.countBadge,
+									{
+										backgroundColor: theme.tint,
+										borderColor: theme.background,
+									},
+								]}
+							>
+								<Text style={styles.countBadgeText}>{wishlistCount}</Text>
+							</View>
+						) : null}
+					</TouchableOpacity>
+				) : null}
+
+				<TouchableOpacity style={styles.iconBtn} activeOpacity={0.8}>
+					<MaterialIcons
+						name="notifications-none"
+						size={22}
+						color={theme.secondaryText}
+					/>
+					<View
+						style={[
+							styles.badge,
+							{
+								backgroundColor: theme.tint,
+								borderColor: theme.background,
+							},
+						]}
+					/>
+				</TouchableOpacity>
+			</View>
 		</View>
 	);
 }
@@ -126,11 +170,33 @@ const styles = StyleSheet.create({
 		letterSpacing: -0.3,
 		color: "#DF6B4F",
 	},
+	rightGroup: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 2,
+	},
 	iconBtn: {
 		width: 36,
 		height: 36,
 		alignItems: "center",
 		justifyContent: "center",
+	},
+	countBadge: {
+		position: "absolute",
+		top: 2,
+		right: 2,
+		minWidth: 16,
+		height: 16,
+		borderRadius: 999,
+		borderWidth: 2,
+		paddingHorizontal: 4,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	countBadgeText: {
+		color: "#fff",
+		fontSize: 9,
+		fontWeight: "800",
 	},
 	badge: {
 		position: "absolute",

@@ -11,7 +11,7 @@
 
 ### 2. **Claude API Integration**
 - ✅ File: `lib/claude.ts`
-- ✅ API Key configured: `sk-ant-api03-m83N1oo...`
+- ✅ API key stored in Supabase edge function secrets as `CLAUDE_API_KEY`
 - ✅ Function: `analyzeGarageSaleVideo()` - Analyzes frames and returns JSON
 
 ### 3. **Video Recorder Component**

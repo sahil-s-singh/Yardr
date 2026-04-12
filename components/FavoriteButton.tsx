@@ -1,128 +1,134 @@
-import { useState, useEffect } from 'react';
-import { TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { router } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { useAuth } from '@/contexts/AuthContext';
-import { favoritesService } from '@/services/favoritesService';
-import { showSignInPrompt, showError } from '@/lib/alerts';
+import { MaterialIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+import { useAuth } from "@/contexts/AuthContext";
+import { showError, showSignInPrompt } from "@/lib/alerts";
+import { favoritesService } from "@/services/favoritesService";
+
+type Variant = "floating" | "inline";
 
 interface FavoriteButtonProps {
-  garageSaleId: string;
-  size?: number;
-  showLabel?: boolean;
+	garageSaleId: string;
+	size?: number;
+	showLabel?: boolean;
+	variant?: Variant;
 }
 
+const TINT = "#DF6B4F";
+
 export default function FavoriteButton({
-  garageSaleId,
-  size = 24,
-  showLabel = false,
+	garageSaleId,
+	size = 24,
+	showLabel = false,
+	variant = "inline",
 }: FavoriteButtonProps) {
-  const { isAuthenticated, user } = useAuth();
-  const [isFavorited, setIsFavorited] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [scaleAnim] = useState(new Animated.Value(1));
+	const { isAuthenticated, user } = useAuth();
+	const [isFavorited, setIsFavorited] = useState(false);
+	const [loading, setLoading] = useState(false);
+	const [scaleAnim] = useState(new Animated.Value(1));
 
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      checkFavoriteStatus();
-    }
-  }, [isAuthenticated, user, garageSaleId]);
+	useEffect(() => {
+		if (!isAuthenticated || !user) return;
+		favoritesService
+			.isFavorited(user.id, garageSaleId)
+			.then(setIsFavorited)
+			.catch((err) => console.error("Error checking favorite status:", err));
+	}, [isAuthenticated, user, garageSaleId]);
 
-  const checkFavoriteStatus = async () => {
-    if (!user) return;
+	const animateHeart = () => {
+		Animated.sequence([
+			Animated.spring(scaleAnim, {
+				toValue: 1.3,
+				friction: 3,
+				useNativeDriver: true,
+			}),
+			Animated.spring(scaleAnim, {
+				toValue: 1,
+				friction: 3,
+				useNativeDriver: true,
+			}),
+		]).start();
+	};
 
-    try {
-      const favorited = await favoritesService.isFavorited(user.id, garageSaleId);
-      setIsFavorited(favorited);
-    } catch (error) {
-      console.error('Error checking favorite status:', error);
-    }
-  };
+	const handlePress = async () => {
+		if (!isAuthenticated) {
+			showSignInPrompt(
+				router,
+				"Please sign in to save your favorite garage sales",
+				"Sign In Required",
+			);
+			return;
+		}
+		if (!user || loading) return;
 
-  const animateHeart = () => {
-    Animated.sequence([
-      Animated.spring(scaleAnim, {
-        toValue: 1.3,
-        friction: 3,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 3,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
+		setLoading(true);
+		try {
+			if (isFavorited) {
+				await favoritesService.removeFavorite(user.id, garageSaleId);
+				setIsFavorited(false);
+			} else {
+				await favoritesService.addFavorite(user.id, garageSaleId);
+				setIsFavorited(true);
+				animateHeart();
+			}
+		} catch (error: any) {
+			console.error("Error toggling favorite:", error);
+			showError(error.message || "Failed to update favorite");
+		} finally {
+			setLoading(false);
+		}
+	};
 
-  const handlePress = async () => {
-    if (!isAuthenticated) {
-      showSignInPrompt(
-        router,
-        'Please sign in to save your favorite garage sales',
-        'Sign In Required'
-      );
-      return;
-    }
+	const iconName = isFavorited ? "favorite" : "favorite-border";
 
-    if (!user || loading) return;
-
-    setLoading(true);
-    try {
-      if (isFavorited) {
-        await favoritesService.removeFavorite(user.id, garageSaleId);
-        setIsFavorited(false);
-      } else {
-        await favoritesService.addFavorite(user.id, garageSaleId);
-        setIsFavorited(true);
-        animateHeart();
-      }
-    } catch (error: any) {
-      console.error('Error toggling favorite:', error);
-      showError(error.message || 'Failed to update favorite');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <TouchableOpacity
-      style={[styles.button, showLabel && styles.buttonWithLabel]}
-      onPress={handlePress}
-      disabled={loading}
-    >
-      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <ThemedText style={[styles.icon, { fontSize: size }]}>
-          {isFavorited ? '❤️' : '🤍'}
-        </ThemedText>
-      </Animated.View>
-      {showLabel && (
-        <ThemedText style={styles.label}>
-          {isFavorited ? 'Favorited' : 'Favorite'}
-        </ThemedText>
-      )}
-    </TouchableOpacity>
-  );
+	return (
+		<TouchableOpacity
+			style={[
+				variant === "floating" ? styles.floating : styles.inline,
+				showLabel && variant === "inline" && styles.inlineWithLabel,
+			]}
+			onPress={handlePress}
+			disabled={loading}
+			activeOpacity={0.8}
+		>
+			<Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+				<MaterialIcons name={iconName} size={size} color={TINT} />
+			</Animated.View>
+			{showLabel && variant === "inline" && (
+				<Text style={styles.label}>{isFavorited ? "Favorited" : "Favorite"}</Text>
+			)}
+		</TouchableOpacity>
+	);
 }
 
 const styles = StyleSheet.create({
-  button: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-  },
-  buttonWithLabel: {
-    flexDirection: 'row',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 20,
-  },
-  icon: {
-    textAlign: 'center',
-  },
-  label: {
-    marginLeft: 4,
-    fontSize: 14,
-    fontWeight: '600',
-  },
+	floating: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	inline: {
+		alignItems: "center",
+		justifyContent: "center",
+		padding: 8,
+	},
+	inlineWithLabel: {
+		flexDirection: "row",
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		backgroundColor: "rgba(223,107,79,0.10)",
+		borderRadius: 999,
+		borderWidth: 1,
+		borderColor: "rgba(223,107,79,0.35)",
+	},
+	label: {
+		marginLeft: 6,
+		fontSize: 14,
+		fontWeight: "800",
+		color: TINT,
+	},
 });

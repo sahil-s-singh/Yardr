@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import * as Notifications from 'expo-notifications';
 import { UserReminder } from '@/types/user';
+import { reminderCopy } from '@/lib/notificationCopy';
 
 export const remindersService = {
   /**
@@ -59,10 +60,11 @@ export const remindersService = {
 
     // Schedule local notification as a fallback
     try {
+      const { title, body } = reminderCopy({ saleTitle: garageSaleTitle });
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
-          title: 'Garage Sale Reminder',
-          body: `${garageSaleTitle} is happening soon!`,
+          title,
+          body,
           data: { type: 'reminder', garageSaleId },
         },
         trigger: {

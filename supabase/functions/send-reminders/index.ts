@@ -10,6 +10,35 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const REMINDER_TEMPLATES = [
+  (title: string) => ({
+    title: "Don't forget 📍",
+    body: `"${title}" is about to kick off. Grab your bag and go.`,
+  }),
+  (title: string) => ({
+    title: "Sale starting ⏰",
+    body: `"${title}" is happening soon — you saved it for a reason.`,
+  }),
+  (title: string) => ({
+    title: "It's go time 🏁",
+    body: `"${title}" is opening up. The early bird gets the good stuff.`,
+  }),
+  (title: string) => ({
+    title: "Heads up 👋",
+    body: `"${title}" kicks off any minute now.`,
+  }),
+  (title: string) => ({
+    title: "Your reminder ⏳",
+    body: `"${title}" starts soon — don't sleep on it.`,
+  }),
+];
+
+function pickReminderCopy(saleTitle: string) {
+  const template =
+    REMINDER_TEMPLATES[Math.floor(Math.random() * REMINDER_TEMPLATES.length)];
+  return template(saleTitle);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -49,11 +78,12 @@ Deno.serve(async (req) => {
 
     for (const reminder of dueReminders) {
       const saleTitle = reminder.garage_sales?.title || "a garage sale";
+      const { title, body } = pickReminderCopy(saleTitle);
       const message = {
         to: reminder.expo_push_token,
         sound: "default",
-        title: "Garage Sale Reminder",
-        body: `${saleTitle} is happening soon!`,
+        title,
+        body,
         data: {
           type: "reminder",
           garageSaleId: reminder.garage_sale_id,

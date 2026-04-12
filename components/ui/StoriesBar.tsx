@@ -10,12 +10,7 @@ interface StoriesBarProps {
 }
 
 export default function StoriesBar({ sales, onStoryPress }: StoriesBarProps) {
-	// Filter sales that have videos
-	const salesWithVideos = sales.filter((sale) => sale.videoUrl);
-
-	if (salesWithVideos.length === 0) {
-		return null;
-	}
+	if (sales.length === 0) return null;
 
 	return (
 		<View style={styles.container}>
@@ -24,7 +19,7 @@ export default function StoriesBar({ sales, onStoryPress }: StoriesBarProps) {
 				showsHorizontalScrollIndicator={false}
 				contentContainerStyle={styles.scrollContent}
 			>
-				{salesWithVideos.map((sale, index) => (
+				{sales.map((sale, index) => (
 					<StoryCircle
 						key={sale.id}
 						imageUrl={sale.images?.[0]}

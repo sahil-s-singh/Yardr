@@ -1,4 +1,5 @@
 import { useVideoPlayer, VideoView } from "expo-video";
+import { router } from "expo-router";
 import React, { useEffect } from "react";
 import {
 	Dimensions,
@@ -40,6 +41,11 @@ export default function StoryViewer({
 		return null;
 	}
 
+	const handleViewDetails = () => {
+		onClose();
+		router.push(`/sale-detail/${sale.id}`);
+	};
+
 	return (
 		<Modal
 			visible={visible}
@@ -62,11 +68,25 @@ export default function StoryViewer({
 					nativeControls={false}
 				/>
 
-				{/* Sale Info Overlay */}
-				<View style={styles.infoContainer}>
-					<Text style={styles.title}>{sale.title}</Text>
-					<Text style={styles.address}>{sale.location.address}</Text>
-				</View>
+				{/* Sale Info Overlay — tap to view details */}
+				<TouchableOpacity
+					style={styles.infoContainer}
+					onPress={handleViewDetails}
+					activeOpacity={0.85}
+				>
+					<View style={styles.infoText}>
+						<Text style={styles.title} numberOfLines={1}>
+							{sale.title}
+						</Text>
+						<Text style={styles.address} numberOfLines={1}>
+							{sale.location.address}
+						</Text>
+					</View>
+					<View style={styles.detailsCta}>
+						<Text style={styles.detailsCtaText}>View Details</Text>
+						<MaterialIcons name="chevron-right" size={18} color="#fff" />
+					</View>
+				</TouchableOpacity>
 			</View>
 		</Modal>
 	);
@@ -100,6 +120,31 @@ const styles = StyleSheet.create({
 		bottom: 60,
 		left: 20,
 		right: 20,
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 12,
+		backgroundColor: "rgba(0,0,0,0.35)",
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		borderRadius: 18,
+	},
+	infoText: {
+		flex: 1,
+	},
+	detailsCta: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 2,
+		backgroundColor: "rgba(223,107,79,0.9)",
+		paddingVertical: 8,
+		paddingLeft: 14,
+		paddingRight: 10,
+		borderRadius: 999,
+	},
+	detailsCtaText: {
+		color: "#fff",
+		fontSize: 13,
+		fontWeight: "800",
 	},
 	title: {
 		fontSize: 20,

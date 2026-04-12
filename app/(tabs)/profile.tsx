@@ -37,6 +37,7 @@ type MenuItemType = {
 const menuItems: MenuItemType[] = [
 	{ label: "My Sales", icon: "grid-view", route: "/my-sales" },
 	{ label: "Saved Sales", icon: "favorite-border", route: null },
+	{ label: "My Wishlist", icon: "local-offer", route: "/wishlists" },
 	{ label: "Notifications", icon: "notifications-none", route: null },
 	{ label: "Settings", icon: "settings", route: null },
 	{ label: "Help & Support", icon: "help-outline", route: null },

@@ -24,13 +24,19 @@ Users can now record a 5-second video of their garage sale items, and Claude AI 
 - **Estimated cost**: ~$0.01-0.02 per video analysis
 - **Free tier**: Enough for 250-500 video analyses
 
-## Step 2: Configure the App
+## Step 2: Store the Key in Supabase Secrets
 
-1. Open `lib/claude.ts`
-2. Replace `YOUR_CLAUDE_API_KEY` with your actual API key:
-   ```typescript
-   const CLAUDE_API_KEY = 'sk-ant-api03-...';
-   ```
+The Claude API key is read by the edge functions (`analyze-video`, `match-wishlist`)
+via `Deno.env.get("CLAUDE_API_KEY")`. Never hardcode it in the client bundle.
+
+Set it once from your local Supabase CLI:
+
+```bash
+supabase secrets set CLAUDE_API_KEY=<your-key>
+```
+
+Or from the Supabase Dashboard → Edge Functions → Secrets → add `CLAUDE_API_KEY`.
+Redeploy the functions after setting the secret so they pick it up.
 
 ## Step 3: Set Up Supabase Storage
 

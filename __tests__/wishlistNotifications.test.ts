@@ -129,8 +129,11 @@ describe("wishlistNotifications", () => {
       await sendWishlistMatchNotification("user-1", "match-1");
 
       const fetchBody = JSON.parse((mockFetch.mock.calls[0][1] as any).body);
-      expect(fetchBody.title).toContain("Wine Glasses");
-      expect(fetchBody.body).toContain("Kitchen Clearout");
+      // Copy is randomized, so check item name + sale title appear somewhere
+      // in the combined title/body payload.
+      const combined = `${fetchBody.title} ${fetchBody.body}`;
+      expect(combined).toContain("Wine Glasses");
+      expect(combined).toContain("Kitchen Clearout");
       expect(fetchBody.data.type).toBe("wishlist_match");
       expect(fetchBody.data.garageSaleId).toBe("sale-1");
     });

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { wishlistMatchCopy } from '@/lib/notificationCopy';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 2000, 4000]; // exponential backoff
@@ -84,11 +85,16 @@ export async function sendWishlistMatchNotification(
 
     const pushToken = profile.expo_push_token;
 
+    const { title, body } = wishlistMatchCopy({
+      itemName: match.user_wishlists.item_name,
+      saleTitle: match.garage_sales.title,
+    });
+
     const message = {
       to: pushToken,
       sound: 'default',
-      title: `Found: ${match.user_wishlists.item_name}!`,
-      body: `"${match.garage_sales.title}" may have what you're looking for!`,
+      title,
+      body,
       data: {
         type: 'wishlist_match',
         matchId: match.id,

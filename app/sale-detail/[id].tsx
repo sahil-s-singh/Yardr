@@ -1,3 +1,5 @@
+import FavoriteButton from "@/components/FavoriteButton";
+import ReminderButton from "@/components/ReminderButton";
 import { garageSaleService } from "@/services/garageSaleService";
 import { GarageSale } from "@/types/garageSale";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -227,6 +229,15 @@ export default function ViewSaleScreen() {
 					<MaterialIcons name="chevron-left" size={28} color="#23201C" />
 				</TouchableOpacity>
 
+				{/* Favorite Button */}
+				<View style={[styles.floatingButton, styles.floatingButtonFavorite]}>
+					<FavoriteButton
+						garageSaleId={sale.id}
+						variant="floating"
+						size={24}
+					/>
+				</View>
+
 				{/* Share Button */}
 				<TouchableOpacity
 					style={[styles.floatingButton, styles.floatingButtonRight]}
@@ -255,13 +266,23 @@ export default function ViewSaleScreen() {
 					</View>
 
 					{/* Date and Time Card */}
-					<View style={styles.infoCard}>
-						<Text style={styles.infoTitle}>
-							{formatFullDate(sale.startDate || sale.date)}
-						</Text>
-						<Text style={styles.infoSub}>
-							{formatTimeRange(sale.startTime, sale.endTime)}
-						</Text>
+					<View style={[styles.infoCard, styles.infoCardRow]}>
+						<View style={styles.infoCardBody}>
+							<Text style={styles.infoTitle}>
+								{formatFullDate(sale.startDate || sale.date)}
+							</Text>
+							<Text style={styles.infoSub}>
+								{formatTimeRange(sale.startTime, sale.endTime)}
+							</Text>
+						</View>
+						<ReminderButton
+							garageSaleId={sale.id}
+							garageSaleTitle={sale.title}
+							garageSaleDate={sale.startDate || sale.date}
+							variant="inline"
+							size={16}
+							showLabel
+						/>
 					</View>
 
 					{/* Description */}
@@ -401,6 +422,10 @@ const styles = StyleSheet.create({
 		left: undefined,
 		right: 16,
 	},
+	floatingButtonFavorite: {
+		left: undefined,
+		right: 64,
+	},
 
 	scrollView: {
 		flex: 1,
@@ -444,6 +469,14 @@ const styles = StyleSheet.create({
 		borderRadius: 18,
 		padding: 16,
 		marginBottom: 16,
+	},
+	infoCardRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 12,
+	},
+	infoCardBody: {
+		flex: 1,
 	},
 	infoTitle: {
 		fontSize: 15,

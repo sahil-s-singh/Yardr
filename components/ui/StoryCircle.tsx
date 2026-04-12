@@ -36,7 +36,6 @@ export default function StoryCircle({
 			style={styles.container}
 			onPress={onPress}
 			activeOpacity={0.7}
-			disabled={!hasVideo}
 		>
 			<View
 				style={[

@@ -12,16 +12,21 @@ import {
 	SafeAreaView,
 	StyleSheet,
 	Text,
+	TouchableOpacity,
 	View,
 } from "react-native";
 import MapView, { Callout, Marker, Region } from "react-native-maps";
 
 import { Colors } from "@/constants/theme";
+import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { garageSaleService } from "@/services/garageSaleService";
+import { wishlistService } from "@/services/wishlistService";
 import { GarageSale } from "@/types/garageSale";
+import { UserWishlistItem } from "@/types/user";
 
 import GradientBackground from "@/components/ui/GradientBackground";
+import SaleMapMarker from "@/components/ui/SaleMapMarker";
 import HeaderBar from "@/components/ui/HeaderBar";
 import RadiusSlider from "@/components/ui/RadiusSlider";
 import SaleCard from "@/components/ui/SaleCard";
@@ -51,6 +56,41 @@ function formatAddress(p: Location.LocationGeocodedAddress | undefined) {
 	return parts.join(" ");
 }
 
+const STOP_WORDS = new Set([
+	"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+	"of", "with", "by", "from", "is", "are", "was", "were", "be", "been",
+	"set", "item", "items", "sale", "garage", "various", "misc", "etc",
+	"any", "some", "new", "old", "used",
+]);
+
+function extractKeywords(text: string): string[] {
+	return text
+		.toLowerCase()
+		.split(/\s+/)
+		.map((w) => w.replace(/[^a-z0-9]/g, ""))
+		.filter((w) => w.length > 2 && !STOP_WORDS.has(w));
+}
+
+function saleMatchesAnyWishlistItem(
+	sale: GarageSale,
+	items: UserWishlistItem[],
+): boolean {
+	if (items.length === 0) return false;
+	const saleText =
+		`${sale.title ?? ""} ${sale.description ?? ""}`.toLowerCase();
+	const saleCats = (sale.categories ?? []).map((c) => c.toLowerCase());
+
+	return items.some((item) => {
+		const cat = item.category?.toLowerCase();
+		if (cat && saleCats.includes(cat)) return true;
+
+		const keywords = extractKeywords(
+			`${item.item_name} ${item.description ?? ""}`,
+		);
+		return keywords.some((k) => saleText.includes(k));
+	});
+}
+
 function haversineKm(
 	a: { latitude: number; longitude: number },
 	b: { latitude: number; longitude: number }
@@ -71,8 +111,12 @@ function haversineKm(
 export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 	const colorScheme = useColorScheme();
 	const theme = Colors[colorScheme ?? "light"];
+	const { user } = useAuth();
 
 	const [mode, setMode] = useState<Mode>(initialMode);
+	const [wishlistItems, setWishlistItems] = useState<UserWishlistItem[]>([]);
+	const [wishlistFilterActive, setWishlistFilterActive] = useState(false);
+	const [markersTrackChanges, setMarkersTrackChanges] = useState(true);
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
@@ -137,6 +181,33 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 		}, [loadSales])
 	);
 
+	// Load the user's wishlist items (for the filter toggle)
+	useFocusEffect(
+		useCallback(() => {
+			if (!user) {
+				setWishlistItems([]);
+				setWishlistFilterActive(false);
+				return;
+			}
+			wishlistService
+				.getUserWishlistItems(user.id)
+				.then((items) => setWishlistItems(items))
+				.catch((err) => console.error("Load wishlist error:", err));
+		}, [user])
+	);
+
+	const handleToggleWishlist = useCallback(() => {
+		if (!user) {
+			router.push("/auth/sign-in");
+			return;
+		}
+		if (wishlistItems.length === 0) {
+			router.push("/add-wishlist-item");
+			return;
+		}
+		setWishlistFilterActive((prev) => !prev);
+	}, [user, wishlistItems.length]);
+
 	// Reload when user finishes adjusting the radius
 	const isInitial = useRef(true);
 	useEffect(() => {
@@ -171,6 +242,24 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 			.sort((a, b) => a._distanceKm - b._distanceKm);
 	}, [sales, userLoc]);
 
+	// Re-enable marker tracking when the sale set changes so new SVG markers
+	// render correctly, then flip it off to avoid expensive native re-snapshots.
+	// See the SVG-in-Marker gotcha in the plan file.
+	useEffect(() => {
+		setMarkersTrackChanges(true);
+		const t = setTimeout(() => setMarkersTrackChanges(false), 300);
+		return () => clearTimeout(t);
+	}, [sales.length]);
+
+	const filteredSales: SaleWithDistance[] = useMemo(() => {
+		if (!wishlistFilterActive || wishlistItems.length === 0) {
+			return salesWithDistance;
+		}
+		return salesWithDistance.filter((s) =>
+			saleMatchesAnyWishlistItem(s, wishlistItems),
+		);
+	}, [salesWithDistance, wishlistFilterActive, wishlistItems]);
+
 	// ~1 degree latitude = 111 km. Add a bit of padding (×2.2) so the circle fits.
 	const radiusDelta = (committedRadius / 111) * 2.2;
 
@@ -202,8 +291,12 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 	}, [committedRadius]);
 
 	const handleStoryPress = useCallback((sale: GarageSale) => {
-		setSelectedStory(sale);
-		setStoryViewerVisible(true);
+		if (sale.videoUrl) {
+			setSelectedStory(sale);
+			setStoryViewerVisible(true);
+		} else {
+			router.push(`/sale-detail/${sale.id}`);
+		}
 	}, []);
 
 	const handleCloseStory = useCallback(() => {
@@ -234,14 +327,17 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 					showsUserLocation={true}
 					showsMyLocationButton={true}
 				>
-					{salesWithDistance.map((s) => (
+					{filteredSales.map((s) => (
 						<Marker
 							key={s.id}
 							coordinate={{
 								latitude: s.location.latitude,
 								longitude: s.location.longitude,
 							}}
+							anchor={{ x: 0.5, y: 0.5 }}
+							tracksViewChanges={markersTrackChanges}
 						>
+							<SaleMapMarker />
 							<Callout
 								onPress={() => router.push(`/sale-detail/${s.id}`)}
 							>
@@ -295,19 +391,42 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 				{/* Header with white background */}
 				<View style={styles.mapHeaderStrip}>
 					<SafeAreaView>
-						<HeaderBar mode={mode} onToggleMode={setMode} />
+						<HeaderBar
+							mode={mode}
+							onToggleMode={setMode}
+							wishlistActive={wishlistFilterActive}
+							onToggleWishlist={handleToggleWishlist}
+							wishlistCount={wishlistItems.length}
+						/>
 						<View style={styles.titleRowMap}>
 							<Text style={[styles.title, { color: theme.text }]}>Discover</Text>
 							{sliderEl && <View style={styles.sliderInline}>{sliderEl}</View>}
 						</View>
+						{wishlistFilterActive ? (
+							<View style={styles.filterBannerMap}>
+								<MaterialIcons name="favorite" size={12} color={theme.tint} />
+								<Text style={[styles.filterBannerText, { color: theme.tint }]}>
+									Wishlist matches only · {filteredSales.length} of {salesWithDistance.length}
+								</Text>
+							</View>
+						) : null}
+						{!loading && (
+							<StoriesBar
+								sales={filteredSales}
+								onStoryPress={handleStoryPress}
+							/>
+						)}
 					</SafeAreaView>
 				</View>
 
-				<StoryViewer
-					visible={storyViewerVisible}
-					sale={selectedStory}
-					onClose={handleCloseStory}
-				/>
+				{selectedStory && (
+					<StoryViewer
+						key={selectedStory.id}
+						visible={storyViewerVisible}
+						sale={selectedStory}
+						onClose={handleCloseStory}
+					/>
+				)}
 			</View>
 		);
 	}
@@ -316,7 +435,13 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 	return (
 		<SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
 			<GradientBackground />
-			<HeaderBar mode={mode} onToggleMode={setMode} />
+			<HeaderBar
+				mode={mode}
+				onToggleMode={setMode}
+				wishlistActive={wishlistFilterActive}
+				onToggleWishlist={handleToggleWishlist}
+				wishlistCount={wishlistItems.length}
+			/>
 
 			<View style={styles.content}>
 				<View style={styles.titleRow}>
@@ -324,9 +449,26 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 					{sliderEl && <View style={styles.sliderInline}>{sliderEl}</View>}
 				</View>
 
+				{wishlistFilterActive ? (
+					<View style={styles.filterBanner}>
+						<MaterialIcons name="favorite" size={14} color={theme.tint} />
+						<Text style={[styles.filterBannerText, { color: theme.tint }]}>
+							Wishlist matches only · {filteredSales.length} of {salesWithDistance.length}
+						</Text>
+						<TouchableOpacity
+							onPress={() => setWishlistFilterActive(false)}
+							hitSlop={10}
+						>
+							<MaterialIcons name="close" size={16} color={theme.tint} />
+						</TouchableOpacity>
+					</View>
+				) : null}
 
 				{!loading && (
-					<StoriesBar sales={salesWithDistance} onStoryPress={handleStoryPress} />
+					<StoriesBar
+						sales={filteredSales}
+						onStoryPress={handleStoryPress}
+					/>
 				)}
 
 				{loading ? (
@@ -335,7 +477,7 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 					</View>
 				) : (
 					<FlatList
-						data={salesWithDistance}
+						data={filteredSales}
 						keyExtractor={(item) => item.id}
 						contentContainerStyle={{
 							paddingBottom: 120,
@@ -351,10 +493,14 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 						ListEmptyComponent={
 							<View style={styles.emptyWrap}>
 								<Text style={[styles.emptyText, { color: theme.secondaryText }]}>
-									No garage sales within {radiusKm} km.
+									{wishlistFilterActive
+										? "No sales match your wishlist yet."
+										: `No garage sales within ${radiusKm} km.`}
 								</Text>
 								<Text style={[styles.emptyHint, { color: theme.secondaryText }]}>
-									Try increasing the distance or pull down to refresh.
+									{wishlistFilterActive
+										? "Try turning off the filter or adding more wishlist items."
+										: "Try increasing the distance or pull down to refresh."}
 								</Text>
 							</View>
 						}
@@ -366,11 +512,14 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 				)}
 			</View>
 
-			<StoryViewer
-				visible={storyViewerVisible}
-				sale={selectedStory}
-				onClose={handleCloseStory}
-			/>
+			{selectedStory && (
+				<StoryViewer
+					key={selectedStory.id}
+					visible={storyViewerVisible}
+					sale={selectedStory}
+					onClose={handleCloseStory}
+				/>
+			)}
 		</SafeAreaView>
 	);
 }
@@ -403,6 +552,34 @@ const styles = StyleSheet.create({
 	},
 
 	loaderWrap: { paddingTop: 30 },
+
+	filterBanner: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 8,
+		backgroundColor: "rgba(223,107,79,0.10)",
+		borderRadius: 999,
+		paddingVertical: 8,
+		paddingHorizontal: 14,
+		marginBottom: 10,
+		alignSelf: "flex-start",
+	},
+	filterBannerMap: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 6,
+		backgroundColor: "rgba(223,107,79,0.10)",
+		borderRadius: 999,
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+		alignSelf: "flex-start",
+		marginLeft: 18,
+		marginBottom: 8,
+	},
+	filterBannerText: {
+		fontSize: 12,
+		fontWeight: "800",
+	},
 
 	emptyWrap: {
 		flex: 1,

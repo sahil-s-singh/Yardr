@@ -3,6 +3,7 @@ import GradientBackground from "@/components/ui/GradientBackground";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -115,12 +116,25 @@ export default function SignUpScreen() {
 		</View>
 	);
 
+	const handleBack = () => {
+		if (router.canGoBack()) router.back();
+		else router.replace("/(tabs)");
+	};
+
 	return (
 		<KeyboardAvoidingView
 			behavior={Platform.OS === "ios" ? "padding" : "height"}
 			style={[styles.container, { backgroundColor: theme.background }]}
 		>
 			<GradientBackground />
+			<TouchableOpacity
+				style={styles.backButton}
+				onPress={handleBack}
+				hitSlop={12}
+				activeOpacity={0.7}
+			>
+				<MaterialIcons name="chevron-left" size={28} color={theme.text} />
+			</TouchableOpacity>
 			<ScrollView contentContainerStyle={styles.scrollContent}>
 				<View style={styles.content}>
 					<View style={styles.logoArea}>
@@ -197,6 +211,17 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
 	container: { flex: 1 },
 	scrollContent: { flexGrow: 1 },
+	backButton: {
+		position: "absolute",
+		top: 54,
+		left: 12,
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		alignItems: "center",
+		justifyContent: "center",
+		zIndex: 10,
+	},
 	content: { flex: 1, padding: 24, paddingTop: 60 },
 	logoArea: { alignItems: "center", marginBottom: 28 },
 	brand: { fontSize: 34, fontWeight: "900", letterSpacing: -0.3, marginTop: 12 },

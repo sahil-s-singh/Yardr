@@ -1,371 +1,435 @@
-import { useState, useEffect } from 'react';
+// app/wishlists.tsx
+import GradientBackground from "@/components/ui/GradientBackground";
+import RadiusSlider from "@/components/ui/RadiusSlider";
+import { Colors } from "@/constants/theme";
+import { useAuth } from "@/contexts/AuthContext";
+import { wishlistService } from "@/services/wishlistService";
+import { UserWishlistItem } from "@/types/user";
+import { MaterialIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
-  StyleSheet,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  RefreshControl,
-} from 'react-native';
-import { router } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { useAuth } from '@/contexts/AuthContext';
-import { wishlistService } from '@/services/wishlistService';
-import { UserWishlistItem } from '@/types/user';
+	ActivityIndicator,
+	Alert,
+	KeyboardAvoidingView,
+	Platform,
+	SafeAreaView,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TextInput,
+	TouchableOpacity,
+	View,
+} from "react-native";
+
+const theme = Colors.light;
+
+const MIN_RADIUS_KM = 1;
+const MAX_RADIUS_KM = 160;
+const DEFAULT_RADIUS_KM = 25;
+const RADIUS_STORAGE_KEY = "@yardr:wishlistRadiusKm";
 
 export default function WishlistsScreen() {
-  const { user, isAuthenticated } = useAuth();
-  const [wishlistItems, setWishlistItems] = useState<UserWishlistItem[]>([]);
-  const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+	const { user, isAuthenticated } = useAuth();
+	const [items, setItems] = useState<UserWishlistItem[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [input, setInput] = useState("");
+	const [submitting, setSubmitting] = useState(false);
+	const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
 
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      loadWishlistItems();
-    } else {
-      setLoading(false);
-    }
-  }, [isAuthenticated, user]);
+	// Load persisted radius
+	useEffect(() => {
+		AsyncStorage.getItem(RADIUS_STORAGE_KEY).then((val) => {
+			const n = val ? parseInt(val, 10) : NaN;
+			if (!Number.isNaN(n) && n >= MIN_RADIUS_KM && n <= MAX_RADIUS_KM) {
+				setRadiusKm(n);
+			}
+		});
+	}, []);
 
-  const loadWishlistItems = async () => {
-    if (!user) return;
+	const loadItems = useCallback(async () => {
+		if (!user) {
+			setLoading(false);
+			return;
+		}
+		try {
+			const data = await wishlistService.getUserWishlistItems(user.id);
+			setItems(data);
+		} catch (error) {
+			console.error("Error loading wishlist items:", error);
+		} finally {
+			setLoading(false);
+		}
+	}, [user]);
 
-    try {
-      const items = await wishlistService.getUserWishlistItems(user.id);
-      setWishlistItems(items);
+	useFocusEffect(
+		useCallback(() => {
+			if (isAuthenticated && user) loadItems();
+			else setLoading(false);
+		}, [isAuthenticated, user, loadItems]),
+	);
 
-      // Load match counts for each item
-      const counts: Record<string, number> = {};
-      await Promise.all(
-        items.map(async (item) => {
-          const count = await wishlistService.getMatchCountForWishlistItem(item.id);
-          counts[item.id] = count;
-        })
-      );
-      setMatchCounts(counts);
-    } catch (error) {
-      console.error('Error loading wishlist items:', error);
-      Alert.alert('Error', 'Failed to load wishlist items');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+	const handleAdd = async () => {
+		const name = input.trim();
+		if (!name || !user) return;
+		setSubmitting(true);
+		try {
+			const created = await wishlistService.addWishlistItem(user.id, name);
+			setItems((prev) => [created, ...prev]);
+			setInput("");
+		} catch (error: any) {
+			console.error("Add wishlist error:", error);
+			Alert.alert("Error", error.message || "Failed to add item");
+		} finally {
+			setSubmitting(false);
+		}
+	};
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    loadWishlistItems();
-  };
+	const handleRemove = async (item: UserWishlistItem) => {
+		setItems((prev) => prev.filter((i) => i.id !== item.id));
+		try {
+			await wishlistService.deleteWishlistItem(item.id);
+		} catch (error) {
+			console.error("Delete wishlist error:", error);
+			loadItems();
+		}
+	};
 
-  const handleDeleteItem = (item: UserWishlistItem) => {
-    Alert.alert(
-      'Delete Wishlist Item',
-      `Remove "${item.item_name}" from your wishlist?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await wishlistService.deleteWishlistItem(item.id);
-              loadWishlistItems();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete wishlist item');
-            }
-          },
-        },
-      ]
-    );
-  };
+	const handleRadiusChange = (val: number) => {
+		setRadiusKm(val);
+		AsyncStorage.setItem(RADIUS_STORAGE_KEY, String(val));
+	};
 
-  if (!isAuthenticated) {
-    return (
-      <ThemedView style={styles.container}>
-        <View style={styles.authPrompt}>
-          <ThemedText type="subtitle" style={styles.authTitle}>
-            Sign In Required
-          </ThemedText>
-          <ThemedText style={styles.authText}>
-            Sign in to create a wishlist and get notified when items you're looking for appear at garage sales!
-          </ThemedText>
-          <TouchableOpacity
-            style={styles.signInButton}
-            onPress={() => router.push('/auth/sign-in')}
-          >
-            <ThemedText style={styles.signInButtonText}>Sign In</ThemedText>
-          </TouchableOpacity>
-        </View>
-      </ThemedView>
-    );
-  }
+	if (!isAuthenticated) {
+		return (
+			<SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+				<GradientBackground />
+				<BackRow />
+				<View style={styles.authPrompt}>
+					<View style={styles.heartWell}>
+						<MaterialIcons name="local-offer" size={56} color={theme.tint} />
+					</View>
+					<Text style={styles.authTitle}>Sign in to build your wishlist</Text>
+					<Text style={styles.authText}>
+						Save items you're hunting for and we'll ping you when they show up
+						at a garage sale nearby.
+					</Text>
+					<TouchableOpacity
+						style={styles.primaryBtn}
+						onPress={() => router.push("/auth/sign-in")}
+					>
+						<Text style={styles.primaryBtnText}>Sign In</Text>
+					</TouchableOpacity>
+				</View>
+			</SafeAreaView>
+		);
+	}
 
-  if (loading) {
-    return (
-      <ThemedView style={styles.container}>
-        <ThemedText>Loading...</ThemedText>
-      </ThemedView>
-    );
-  }
+	return (
+		<SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+			<GradientBackground />
+			<BackRow />
 
-  return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-      }
-    >
-      <ThemedView style={styles.content}>
-        <View style={styles.header}>
-          <ThemedText type="subtitle" style={styles.headerText}>
-            My Wishlist
-          </ThemedText>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => router.push('/add-wishlist-item')}
-          >
-            <ThemedText style={styles.addButtonText}>+ Add Item</ThemedText>
-          </TouchableOpacity>
-        </View>
+			<KeyboardAvoidingView
+				style={styles.flex}
+				behavior={Platform.OS === "ios" ? "padding" : undefined}
+			>
+				<ScrollView
+					style={styles.flex}
+					contentContainerStyle={styles.content}
+					keyboardShouldPersistTaps="handled"
+					showsVerticalScrollIndicator={false}
+				>
+					<View style={styles.titleBlock}>
+						<Text style={styles.title}>My Wishlist</Text>
+						<Text style={styles.subtitle}>
+							{items.length === 0
+								? "Add things you're hunting for"
+								: `${items.length} tag${items.length === 1 ? "" : "s"} you're hunting for`}
+						</Text>
+					</View>
 
-        {wishlistItems.length === 0 ? (
-          <View style={styles.emptyState}>
-            <ThemedText style={styles.emptyIcon}>🔍</ThemedText>
-            <ThemedText type="subtitle" style={styles.emptyTitle}>
-              No wishlist items yet
-            </ThemedText>
-            <ThemedText style={styles.emptyText}>
-              Add items you're looking for and we'll notify you when they appear at garage sales!
-            </ThemedText>
-            <TouchableOpacity
-              style={styles.emptyButton}
-              onPress={() => router.push('/add-wishlist-item')}
-            >
-              <ThemedText style={styles.emptyButtonText}>Add Your First Item</ThemedText>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.list}>
-            {wishlistItems.map((item) => (
-              <View key={item.id} style={styles.itemCard}>
-                <View style={styles.itemHeader}>
-                  <View style={styles.itemTitleRow}>
-                    <ThemedText type="defaultSemiBold" style={styles.itemName}>
-                      {item.item_name}
-                    </ThemedText>
-                    {matchCounts[item.id] > 0 && (
-                      <View style={styles.matchBadge}>
-                        <ThemedText style={styles.matchBadgeText}>
-                          {matchCounts[item.id]}
-                        </ThemedText>
-                      </View>
-                    )}
-                  </View>
-                  {item.category && (
-                    <View style={styles.categoryTag}>
-                      <ThemedText style={styles.categoryText}>
-                        {item.category}
-                      </ThemedText>
-                    </View>
-                  )}
-                </View>
+					{/* Quick add input */}
+					<View style={styles.inputRow}>
+						<TextInput
+							style={styles.input}
+							value={input}
+							onChangeText={setInput}
+							placeholder="e.g. record player, cast iron skillet"
+							placeholderTextColor={theme.secondaryText}
+							returnKeyType="done"
+							onSubmitEditing={handleAdd}
+							editable={!submitting}
+						/>
+						<TouchableOpacity
+							style={[
+								styles.addBtn,
+								(!input.trim() || submitting) && styles.addBtnDisabled,
+							]}
+							onPress={handleAdd}
+							disabled={!input.trim() || submitting}
+							activeOpacity={0.85}
+						>
+							<MaterialIcons name="add" size={22} color="#fff" />
+						</TouchableOpacity>
+					</View>
 
-                {item.description && (
-                  <ThemedText style={styles.itemDescription}>
-                    {item.description}
-                  </ThemedText>
-                )}
+					{/* Range slider */}
+					<View style={styles.rangeBlock}>
+						<View style={styles.rangeHeader}>
+							<MaterialIcons
+								name="my-location"
+								size={16}
+								color={theme.secondaryText}
+							/>
+							<Text style={styles.rangeLabel}>Wishlist range</Text>
+							<Text style={styles.rangeHint}>
+								Alert me for sales within this distance
+							</Text>
+						</View>
+						<RadiusSlider
+							min={MIN_RADIUS_KM}
+							max={MAX_RADIUS_KM}
+							value={radiusKm}
+							onValueChange={handleRadiusChange}
+							trackColor={theme.border}
+						/>
+					</View>
 
-                <View style={styles.itemActions}>
-                  <TouchableOpacity
-                    style={styles.viewMatchesButton}
-                    onPress={() => router.push(`/wishlist-matches/${item.id}`)}
-                  >
-                    <ThemedText style={styles.viewMatchesText}>
-                      View Matches {matchCounts[item.id] > 0 ? `(${matchCounts[item.id]})` : ''}
-                    </ThemedText>
-                  </TouchableOpacity>
+					{/* Tag list */}
+					<View style={styles.tagSection}>
+						<Text style={styles.sectionLabel}>Your tags</Text>
 
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => handleDeleteItem(item)}
-                  >
-                    <ThemedText style={styles.deleteButtonText}>Delete</ThemedText>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-      </ThemedView>
-    </ScrollView>
-  );
+						{loading ? (
+							<ActivityIndicator color={theme.tint} style={{ marginTop: 20 }} />
+						) : items.length === 0 ? (
+							<View style={styles.emptyBlock}>
+								<MaterialIcons
+									name="local-offer"
+									size={28}
+									color={theme.secondaryText}
+								/>
+								<Text style={styles.emptyText}>
+									No tags yet — add one above
+								</Text>
+							</View>
+						) : (
+							<View style={styles.tagWrap}>
+								{items.map((item) => (
+									<View key={item.id} style={styles.tag}>
+										<Text style={styles.tagText}>{item.item_name}</Text>
+										<TouchableOpacity
+											onPress={() => handleRemove(item)}
+											hitSlop={10}
+											style={styles.tagClose}
+										>
+											<MaterialIcons name="close" size={14} color={theme.tint} />
+										</TouchableOpacity>
+									</View>
+								))}
+							</View>
+						)}
+					</View>
+				</ScrollView>
+			</KeyboardAvoidingView>
+		</SafeAreaView>
+	);
+}
+
+function BackRow() {
+	return (
+		<View style={styles.backRow}>
+			<TouchableOpacity onPress={() => router.back()} hitSlop={12}>
+				<MaterialIcons name="chevron-left" size={28} color={theme.text} />
+			</TouchableOpacity>
+		</View>
+	);
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  authPrompt: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  authTitle: {
-    marginBottom: 12,
-  },
-  authText: {
-    textAlign: 'center',
-    opacity: 0.7,
-    marginBottom: 24,
-    color: '#000',
-  },
-  signInButton: {
-    backgroundColor: '#0066FF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  signInButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  headerText: {
-    fontSize: 20,
-  },
-  addButton: {
-    backgroundColor: '#0066FF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingTop: 60,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    marginBottom: 8,
-  },
-  emptyText: {
-    textAlign: 'center',
-    opacity: 0.7,
-    marginBottom: 24,
-    paddingHorizontal: 32,
-    color: '#000',
-  },
-  emptyButton: {
-    backgroundColor: '#0066FF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  emptyButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  list: {
-    gap: 12,
-  },
-  itemCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  itemHeader: {
-    marginBottom: 8,
-  },
-  itemTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  itemName: {
-    fontSize: 16,
-    flex: 1,
-    color: '#000',
-  },
-  matchBadge: {
-    backgroundColor: '#0066FF',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    minWidth: 24,
-    alignItems: 'center',
-  },
-  matchBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  categoryTag: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#e0e0e0',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  categoryText: {
-    fontSize: 12,
-    opacity: 0.8,
-    color: '#000',
-  },
-  itemDescription: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginBottom: 12,
-    color: '#000',
-  },
-  itemActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  viewMatchesButton: {
-    flex: 1,
-    backgroundColor: '#0066FF',
-    borderRadius: 8,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  viewMatchesText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  deleteButton: {
-    backgroundColor: '#ff3b30',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
+	safe: { flex: 1 },
+	flex: { flex: 1 },
+
+	backRow: {
+		paddingHorizontal: 16,
+		paddingTop: 4,
+		paddingBottom: 2,
+	},
+
+	content: {
+		paddingHorizontal: 18,
+		paddingTop: 2,
+		paddingBottom: 60,
+	},
+
+	titleBlock: { marginBottom: 20 },
+	title: {
+		fontSize: 28,
+		fontWeight: "900",
+		letterSpacing: -0.4,
+		color: theme.text,
+	},
+	subtitle: {
+		marginTop: 4,
+		fontSize: 14,
+		fontWeight: "600",
+		color: theme.secondaryText,
+	},
+
+	inputRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 10,
+		marginBottom: 22,
+	},
+	input: {
+		flex: 1,
+		height: 52,
+		borderRadius: 16,
+		backgroundColor: theme.card,
+		paddingHorizontal: 16,
+		fontSize: 15,
+		fontWeight: "600",
+		color: theme.text,
+		borderWidth: 1,
+		borderColor: theme.border,
+	},
+	addBtn: {
+		width: 52,
+		height: 52,
+		borderRadius: 16,
+		backgroundColor: theme.tint,
+		alignItems: "center",
+		justifyContent: "center",
+		shadowColor: theme.tint,
+		shadowOpacity: 0.3,
+		shadowRadius: 10,
+		shadowOffset: { width: 0, height: 6 },
+		elevation: 4,
+	},
+	addBtnDisabled: {
+		opacity: 0.4,
+	},
+
+	rangeBlock: {
+		backgroundColor: theme.card,
+		borderRadius: 18,
+		padding: 16,
+		borderWidth: 1,
+		borderColor: theme.border,
+		marginBottom: 22,
+	},
+	rangeHeader: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 6,
+		marginBottom: 10,
+		flexWrap: "wrap",
+	},
+	rangeLabel: {
+		fontSize: 14,
+		fontWeight: "800",
+		color: theme.text,
+	},
+	rangeHint: {
+		fontSize: 12,
+		fontWeight: "500",
+		color: theme.secondaryText,
+		flexShrink: 1,
+	},
+
+	tagSection: {},
+	sectionLabel: {
+		fontSize: 12,
+		fontWeight: "800",
+		color: theme.secondaryText,
+		letterSpacing: 0.6,
+		textTransform: "uppercase",
+		marginBottom: 12,
+	},
+
+	tagWrap: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 10,
+	},
+	tag: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 8,
+		backgroundColor: "rgba(223,107,79,0.12)",
+		borderWidth: 1,
+		borderColor: "rgba(223,107,79,0.35)",
+		borderRadius: 999,
+		paddingLeft: 14,
+		paddingRight: 10,
+		paddingVertical: 8,
+	},
+	tagText: {
+		fontSize: 14,
+		fontWeight: "700",
+		color: theme.tint,
+	},
+	tagClose: {
+		width: 20,
+		height: 20,
+		borderRadius: 10,
+		backgroundColor: "rgba(223,107,79,0.18)",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+
+	emptyBlock: {
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 30,
+		gap: 8,
+	},
+	emptyText: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: theme.secondaryText,
+	},
+
+	authPrompt: {
+		flex: 1,
+		alignItems: "center",
+		justifyContent: "center",
+		paddingHorizontal: 32,
+	},
+	authTitle: {
+		fontSize: 22,
+		fontWeight: "800",
+		color: theme.text,
+		marginBottom: 8,
+		textAlign: "center",
+	},
+	authText: {
+		fontSize: 14,
+		color: theme.secondaryText,
+		textAlign: "center",
+		lineHeight: 20,
+		marginBottom: 24,
+	},
+	heartWell: {
+		width: 108,
+		height: 108,
+		borderRadius: 54,
+		backgroundColor: "rgba(223,107,79,0.10)",
+		alignItems: "center",
+		justifyContent: "center",
+		marginBottom: 20,
+	},
+	primaryBtn: {
+		backgroundColor: theme.tint,
+		paddingHorizontal: 28,
+		paddingVertical: 14,
+		borderRadius: 16,
+	},
+	primaryBtnText: {
+		color: "#fff",
+		fontWeight: "800",
+		fontSize: 15,
+	},
 });
