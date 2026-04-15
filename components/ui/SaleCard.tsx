@@ -31,13 +31,25 @@ export default function SaleCard({
 	sale,
 	distanceText,
 	onPress,
+	highlighted = false,
 }: {
 	sale: GarageSale;
 	distanceText?: string;
 	onPress?: () => void;
+	highlighted?: boolean;
 }) {
 	const colorScheme = useColorScheme();
 	const theme = Colors[colorScheme ?? "light"];
+
+	const highlightStyle = highlighted
+		? {
+				borderWidth: 2,
+				borderColor: theme.tint,
+				shadowColor: theme.tint,
+				shadowOpacity: 0.25,
+				shadowRadius: 16,
+			}
+		: null;
 
 	const img = sale.images?.[0];
 	const videoUrl = sale.videoUrl;
@@ -125,7 +137,7 @@ export default function SaleCard({
 	if (onPress) {
 		return (
 			<TouchableOpacity
-				style={[styles.card, { backgroundColor: theme.card }]}
+				style={[styles.card, { backgroundColor: theme.card }, highlightStyle]}
 				onPress={onPress}
 				activeOpacity={0.95}
 			>
@@ -135,7 +147,7 @@ export default function SaleCard({
 	}
 
 	return (
-		<View style={[styles.card, { backgroundColor: theme.card }]}>
+		<View style={[styles.card, { backgroundColor: theme.card }, highlightStyle]}>
 			{content}
 		</View>
 	);

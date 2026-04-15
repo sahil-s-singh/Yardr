@@ -12,7 +12,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 
 const TABS = [
 	{ key: "index", icon: "home" as const, route: "/(tabs)" },
-	{ key: "map", icon: "location-on" as const, route: "/(tabs)/map" },
+	{ key: "wishlists", icon: "local-offer" as const, route: "/wishlists" },
 	{ key: "sell", icon: "add" as const, route: "/sell" },
 	{ key: "search", icon: "search" as const, route: "/(tabs)/search" },
 	{ key: "profile", icon: "person-outline" as const, route: "/(tabs)/profile" },
@@ -27,7 +27,7 @@ export default function CustomTabBar() {
 
 	const getActiveKey = () => {
 		if (pathname === "/" || pathname === "/index") return "index";
-		if (pathname === "/map") return "map";
+		if (pathname.startsWith("/wishlist")) return "wishlists";
 		if (pathname === "/profile") return "profile";
 		if (pathname === "/search") return "search";
 		if (pathname.startsWith("/sell")) return "sell";

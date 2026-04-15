@@ -1,14 +1,12 @@
 // app/wishlists.tsx
 import GradientBackground from "@/components/ui/GradientBackground";
-import RadiusSlider from "@/components/ui/RadiusSlider";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { wishlistService } from "@/services/wishlistService";
 import { UserWishlistItem } from "@/types/user";
 import { MaterialIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
@@ -25,28 +23,12 @@ import {
 
 const theme = Colors.light;
 
-const MIN_RADIUS_KM = 1;
-const MAX_RADIUS_KM = 160;
-const DEFAULT_RADIUS_KM = 25;
-const RADIUS_STORAGE_KEY = "@yardr:wishlistRadiusKm";
-
 export default function WishlistsScreen() {
 	const { user, isAuthenticated } = useAuth();
 	const [items, setItems] = useState<UserWishlistItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [input, setInput] = useState("");
 	const [submitting, setSubmitting] = useState(false);
-	const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
-
-	// Load persisted radius
-	useEffect(() => {
-		AsyncStorage.getItem(RADIUS_STORAGE_KEY).then((val) => {
-			const n = val ? parseInt(val, 10) : NaN;
-			if (!Number.isNaN(n) && n >= MIN_RADIUS_KM && n <= MAX_RADIUS_KM) {
-				setRadiusKm(n);
-			}
-		});
-	}, []);
 
 	const loadItems = useCallback(async () => {
 		if (!user) {
@@ -94,11 +76,6 @@ export default function WishlistsScreen() {
 			console.error("Delete wishlist error:", error);
 			loadItems();
 		}
-	};
-
-	const handleRadiusChange = (val: number) => {
-		setRadiusKm(val);
-		AsyncStorage.setItem(RADIUS_STORAGE_KEY, String(val));
 	};
 
 	if (!isAuthenticated) {
@@ -173,28 +150,6 @@ export default function WishlistsScreen() {
 						>
 							<MaterialIcons name="add" size={22} color="#fff" />
 						</TouchableOpacity>
-					</View>
-
-					{/* Range slider */}
-					<View style={styles.rangeBlock}>
-						<View style={styles.rangeHeader}>
-							<MaterialIcons
-								name="my-location"
-								size={16}
-								color={theme.secondaryText}
-							/>
-							<Text style={styles.rangeLabel}>Wishlist range</Text>
-							<Text style={styles.rangeHint}>
-								Alert me for sales within this distance
-							</Text>
-						</View>
-						<RadiusSlider
-							min={MIN_RADIUS_KM}
-							max={MAX_RADIUS_KM}
-							value={radiusKm}
-							onValueChange={handleRadiusChange}
-							trackColor={theme.border}
-						/>
 					</View>
 
 					{/* Tag list */}
@@ -310,33 +265,6 @@ const styles = StyleSheet.create({
 	},
 	addBtnDisabled: {
 		opacity: 0.4,
-	},
-
-	rangeBlock: {
-		backgroundColor: theme.card,
-		borderRadius: 18,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: theme.border,
-		marginBottom: 22,
-	},
-	rangeHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 6,
-		marginBottom: 10,
-		flexWrap: "wrap",
-	},
-	rangeLabel: {
-		fontSize: 14,
-		fontWeight: "800",
-		color: theme.text,
-	},
-	rangeHint: {
-		fontSize: 12,
-		fontWeight: "500",
-		color: theme.secondaryText,
-		flexShrink: 1,
 	},
 
 	tagSection: {},

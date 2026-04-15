@@ -1,4 +1,5 @@
 // app/sell/video.tsx — Step 2: Sale Details
+import AddressAutocomplete from "@/components/ui/AddressAutocomplete";
 import GradientBackground from "@/components/ui/GradientBackground";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { analyzeGarageSaleVideo } from "@/lib/claude";
@@ -249,12 +250,15 @@ export default function ReviewScreen() {
 
 				<View style={styles.fieldGroup}>
 					<Text style={styles.label}>Address</Text>
-					<TextInput
-						style={styles.glassInput}
+					<AddressAutocomplete
 						value={addressLine}
 						onChangeText={setAddressLine}
-						placeholder="Enter your address"
-						placeholderTextColor="#807A73"
+						onSelect={(address, c) => {
+							setAddressLine(address);
+							setCoords(c);
+						}}
+						inputStyle={styles.glassInput}
+						biasCoords={coords}
 					/>
 				</View>
 

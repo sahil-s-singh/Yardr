@@ -32,15 +32,13 @@ type MenuItemType = {
 	label: string;
 	icon: keyof typeof MaterialIcons.glyphMap;
 	route: string | null;
+	color: string;
 };
 
 const menuItems: MenuItemType[] = [
-	{ label: "My Sales", icon: "grid-view", route: "/my-sales" },
-	{ label: "Saved Sales", icon: "favorite-border", route: null },
-	{ label: "My Wishlist", icon: "local-offer", route: "/wishlists" },
-	{ label: "Notifications", icon: "notifications-none", route: null },
-	{ label: "Settings", icon: "settings", route: null },
-	{ label: "Help & Support", icon: "help-outline", route: null },
+	{ label: "Wishlist", icon: "local-offer", route: "/wishlists", color: Accent.peach },
+	{ label: "Notifications", icon: "notifications-none", route: "/notifications", color: Accent.gold },
+	{ label: "Settings", icon: "settings", route: null, color: Accent.indigo },
 ];
 
 export default function ProfileScreen() {
@@ -176,46 +174,29 @@ export default function ProfileScreen() {
 					))}
 				</View>
 
-				{/* Menu Card */}
-				<View style={[styles.menuCard, { backgroundColor: theme.card }]}>
-					{menuItems.map((item, i) => (
-						<View key={item.label}>
-							<TouchableOpacity
-								style={styles.menuItem}
-								onPress={() =>
-									item.route
-										? router.push(item.route as any)
-										: showComingSoon(item.label)
-								}
+				{/* Menu Grid */}
+				<View style={styles.menuGrid}>
+					{menuItems.map((item) => (
+						<TouchableOpacity
+							key={item.label}
+							style={[styles.menuTile, { backgroundColor: theme.card }]}
+							onPress={() =>
+								item.route
+									? router.push(item.route as any)
+									: showComingSoon(item.label)
+							}
+							activeOpacity={0.85}
+						>
+							<MaterialIcons name={item.icon} size={20} color={item.color} />
+							<Text
+								style={[styles.menuTileLabel, { color: item.color }]}
+								numberOfLines={1}
+								adjustsFontSizeToFit
+								minimumFontScale={0.8}
 							>
-								<MaterialIcons
-									name={item.icon}
-									size={22}
-									color={theme.secondaryText}
-								/>
-								<Text
-									style={[
-										styles.menuText,
-										{ color: theme.text, flex: 1 },
-									]}
-								>
-									{item.label}
-								</Text>
-								<MaterialIcons
-									name="chevron-right"
-									size={20}
-									color={theme.secondaryText}
-								/>
-							</TouchableOpacity>
-							{i < menuItems.length - 1 && (
-								<View
-									style={[
-										styles.menuDivider,
-										{ backgroundColor: theme.border },
-									]}
-								/>
-							)}
-						</View>
+								{item.label}
+							</Text>
+						</TouchableOpacity>
 					))}
 				</View>
 
@@ -288,23 +269,30 @@ const styles = StyleSheet.create({
 		borderRadius: 18,
 		padding: 16,
 		alignItems: "center",
+		justifyContent: "center",
+		minHeight: 104,
 	},
 	statValue: { fontSize: 22, fontWeight: "900", marginTop: 4 },
 	statLabel: { marginTop: 4, fontSize: 12, fontWeight: "600" },
 
-	menuCard: {
-		borderRadius: 22,
-		overflow: "hidden",
+	menuGrid: {
+		flexDirection: "row",
+		gap: 12,
 		marginBottom: 16,
 	},
-	menuItem: {
+	menuTile: {
+		flex: 1,
+		borderRadius: 18,
 		padding: 16,
-		flexDirection: "row",
 		alignItems: "center",
-		gap: 14,
+		justifyContent: "center",
+		minHeight: 104,
 	},
-	menuText: { fontSize: 16, fontWeight: "600" },
-	menuDivider: { height: 1, marginHorizontal: 16 },
+	menuTileLabel: {
+		marginTop: 8,
+		fontSize: 12,
+		fontWeight: "700",
+	},
 
 	logout: {
 		padding: 16,

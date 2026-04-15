@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import LogoIcon from "@/assets/splash/logo-center.svg";
 import { MaterialIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
@@ -12,6 +13,7 @@ interface HeaderBarProps {
 	wishlistActive?: boolean;
 	onToggleWishlist?: () => void;
 	wishlistCount?: number;
+	unreadNotifications?: number;
 }
 
 export default function HeaderBar({
@@ -20,6 +22,7 @@ export default function HeaderBar({
 	wishlistActive,
 	onToggleWishlist,
 	wishlistCount,
+	unreadNotifications = 0,
 }: HeaderBarProps) {
 	const colorScheme = useColorScheme();
 	const theme = Colors[colorScheme ?? "light"];
@@ -109,21 +112,27 @@ export default function HeaderBar({
 					</TouchableOpacity>
 				) : null}
 
-				<TouchableOpacity style={styles.iconBtn} activeOpacity={0.8}>
+				<TouchableOpacity
+					style={styles.iconBtn}
+					activeOpacity={0.8}
+					onPress={() => router.push("/notifications")}
+				>
 					<MaterialIcons
 						name="notifications-none"
 						size={22}
 						color={theme.secondaryText}
 					/>
-					<View
-						style={[
-							styles.badge,
-							{
-								backgroundColor: theme.tint,
-								borderColor: theme.background,
-							},
-						]}
-					/>
+					{unreadNotifications > 0 ? (
+						<View
+							style={[
+								styles.badge,
+								{
+									backgroundColor: theme.tint,
+									borderColor: theme.background,
+								},
+							]}
+						/>
+					) : null}
 				</TouchableOpacity>
 			</View>
 		</View>

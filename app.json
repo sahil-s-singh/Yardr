@@ -13,7 +13,8 @@
       "bundleIdentifier": "com.sahil.yardr",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "buildNumber": "3"
     },
     "android": {
       "adaptiveIcon": {
@@ -56,6 +57,12 @@
         "expo-camera",
         {
           "cameraPermission": "Allow Yardr to use your camera to record sale videos."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Yardr to use your location to find nearby garage sales."
         }
       ]
     ],

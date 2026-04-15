@@ -159,26 +159,55 @@ export default function ViewSaleScreen() {
 		if (!sale) return;
 
 		const { latitude, longitude, address } = sale.location;
+		const hasCoords = Boolean(latitude && longitude);
+		const encodedAddress = address ? encodeURIComponent(address) : "";
+		const label = encodedAddress || "Garage Sale";
 
-		if (latitude && longitude) {
-			if (Platform.OS === "ios") {
-				const url = `http://maps.apple.com/?daddr=${latitude},${longitude}`;
-				Linking.openURL(url);
-			} else {
-				const navUrl = `google.navigation:q=${latitude},${longitude}`;
-				const webUrl = `https://maps.google.com/?q=${latitude},${longitude}`;
+		type MapApp = { label: string; url: string };
+		const options: MapApp[] = [];
 
-				const canOpen = await Linking.canOpenURL(navUrl);
-				Linking.openURL(canOpen ? navUrl : webUrl);
-			}
-		} else if (address) {
-			const encodedAddress = encodeURIComponent(address);
-			const url =
-				Platform.OS === "ios"
-					? `http://maps.apple.com/?q=${encodedAddress}`
-					: `https://maps.google.com/?q=${encodedAddress}`;
-			Linking.openURL(url);
+		if (Platform.OS === "ios") {
+			options.push({
+				label: "Apple Maps",
+				url: hasCoords
+					? `http://maps.apple.com/?daddr=${latitude},${longitude}&q=${label}`
+					: `http://maps.apple.com/?q=${encodedAddress}`,
+			});
 		}
+
+		options.push({
+			label: "Google Maps",
+			url: hasCoords
+				? `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`
+				: `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`,
+		});
+
+		options.push({
+			label: "Waze",
+			url: hasCoords
+				? `https://waze.com/ul?ll=${latitude}%2C${longitude}&navigate=yes`
+				: `https://waze.com/ul?q=${encodedAddress}&navigate=yes`,
+		});
+
+		const open = (url: string) => {
+			Linking.openURL(url).catch((err) => {
+				console.error("Failed to open map app:", err);
+				Alert.alert("Unable to open", "Could not open the selected map app.");
+			});
+		};
+
+		Alert.alert(
+			"Get directions",
+			"Open in which map?",
+			[
+				...options.map((opt) => ({
+					text: opt.label,
+					onPress: () => open(opt.url),
+				})),
+				{ text: "Cancel", style: "cancel" as const },
+			],
+			{ cancelable: true },
+		);
 	};
 
 	const handleCall = () => {

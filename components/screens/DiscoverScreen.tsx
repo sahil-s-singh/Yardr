@@ -20,6 +20,7 @@ import MapView, { Callout, Marker, Region } from "react-native-maps";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { notificationHistory } from "@/lib/notificationHistory";
 import { garageSaleService } from "@/services/garageSaleService";
 import { wishlistService } from "@/services/wishlistService";
 import { GarageSale } from "@/types/garageSale";
@@ -38,6 +39,7 @@ type Mode = "list" | "map";
 type SaleWithDistance = GarageSale & {
 	_distanceKm: number;
 	_distanceText: string;
+	_isWishlistMatch: boolean;
 };
 
 const DEFAULT_RADIUS_KM = 25;
@@ -140,9 +142,8 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 	const [storyViewerVisible, setStoryViewerVisible] = useState(false);
 
 	const loadSales = useCallback(async () => {
+		setLoading(true);
 		try {
-			setLoading(true);
-
 			const perm = await Location.requestForegroundPermissionsAsync();
 			if (perm.status !== "granted") {
 				const list = await garageSaleService.getAllGarageSales();
@@ -151,20 +152,37 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 				return;
 			}
 
-			const pos = await Location.getCurrentPositionAsync({});
-			const loc = {
-				latitude: pos.coords.latitude,
-				longitude: pos.coords.longitude,
-			};
+			let loc: { latitude: number; longitude: number } | null = null;
+			try {
+				const pos = await Location.getCurrentPositionAsync({});
+				loc = {
+					latitude: pos.coords.latitude,
+					longitude: pos.coords.longitude,
+				};
+			} catch (locErr) {
+				console.warn("Could not get current location, falling back:", locErr);
+			}
+
+			if (!loc) {
+				const list = await garageSaleService.getAllGarageSales();
+				setSales(list);
+				setAddressLine("Location unavailable");
+				return;
+			}
+
 			setUserLoc(loc);
 
-			const geos = await Location.reverseGeocodeAsync(loc);
-			setAddressLine(formatAddress(geos?.[0]) || "Your location");
+			try {
+				const geos = await Location.reverseGeocodeAsync(loc);
+				setAddressLine(formatAddress(geos?.[0]) || "Your location");
+			} catch {
+				setAddressLine("Your location");
+			}
 
 			const list = await garageSaleService.getGarageSalesNearby(
 				loc.latitude,
 				loc.longitude,
-				committedRadius
+				committedRadius,
 			);
 			setSales(list);
 		} catch (e) {
@@ -194,6 +212,16 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 				.then((items) => setWishlistItems(items))
 				.catch((err) => console.error("Load wishlist error:", err));
 		}, [user])
+	);
+
+	const [unreadNotifications, setUnreadNotifications] = useState(0);
+	useFocusEffect(
+		useCallback(() => {
+			notificationHistory
+				.unreadCount()
+				.then(setUnreadNotifications)
+				.catch(() => setUnreadNotifications(0));
+		}, []),
 	);
 
 	const handleToggleWishlist = useCallback(() => {
@@ -228,7 +256,15 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 	}, [loadSales]);
 
 	const salesWithDistance: SaleWithDistance[] = useMemo(() => {
-		if (!userLoc) return sales.map((s) => ({ ...s, _distanceKm: 0, _distanceText: "" }));
+		const withMatchFlag = (s: GarageSale, distance: number, text: string) => ({
+			...s,
+			_distanceKm: distance,
+			_distanceText: text,
+			_isWishlistMatch:
+				wishlistItems.length > 0 && saleMatchesAnyWishlistItem(s, wishlistItems),
+		});
+
+		if (!userLoc) return sales.map((s) => withMatchFlag(s, 0, ""));
 
 		return sales
 			.map((s) => {
@@ -237,10 +273,10 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 					km >= 1
 						? `${Math.round(km)} km`
 						: `${Math.round(km * 1000)} m`;
-				return { ...s, _distanceKm: km, _distanceText: distanceText };
+				return withMatchFlag(s, km, distanceText);
 			})
 			.sort((a, b) => a._distanceKm - b._distanceKm);
-	}, [sales, userLoc]);
+	}, [sales, userLoc, wishlistItems]);
 
 	// Re-enable marker tracking when the sale set changes so new SVG markers
 	// render correctly, then flip it off to avoid expensive native re-snapshots.
@@ -251,14 +287,31 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 		return () => clearTimeout(t);
 	}, [sales.length]);
 
-	const filteredSales: SaleWithDistance[] = useMemo(() => {
+	// When wishlist filter is on, float matching sales to the top while keeping
+	// non-matches below. Distance ordering is preserved within each group.
+	const displayedSales: SaleWithDistance[] = useMemo(() => {
 		if (!wishlistFilterActive || wishlistItems.length === 0) {
 			return salesWithDistance;
 		}
-		return salesWithDistance.filter((s) =>
-			saleMatchesAnyWishlistItem(s, wishlistItems),
-		);
-	}, [salesWithDistance, wishlistFilterActive, wishlistItems]);
+		const matches = salesWithDistance.filter((s) => s._isWishlistMatch);
+		const rest = salesWithDistance.filter((s) => !s._isWishlistMatch);
+		return [...matches, ...rest];
+	}, [salesWithDistance, wishlistFilterActive, wishlistItems.length]);
+
+	const matchedSalesCount = useMemo(
+		() => salesWithDistance.filter((s) => s._isWishlistMatch).length,
+		[salesWithDistance],
+	);
+
+	// Count of wishlist items that have at least one matching sale within the
+	// current radius. `salesWithDistance` is already bounded by `committedRadius`
+	// since `getGarageSalesNearby` fetches within that radius.
+	const matchedWishlistCount = useMemo(() => {
+		if (wishlistItems.length === 0 || salesWithDistance.length === 0) return 0;
+		return wishlistItems.filter((item) =>
+			salesWithDistance.some((sale) => saleMatchesAnyWishlistItem(sale, [item])),
+		).length;
+	}, [wishlistItems, salesWithDistance]);
 
 	// ~1 degree latitude = 111 km. Add a bit of padding (×2.2) so the circle fits.
 	const radiusDelta = (committedRadius / 111) * 2.2;
@@ -327,7 +380,7 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 					showsUserLocation={true}
 					showsMyLocationButton={true}
 				>
-					{filteredSales.map((s) => (
+					{displayedSales.map((s) => (
 						<Marker
 							key={s.id}
 							coordinate={{
@@ -396,7 +449,8 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 							onToggleMode={setMode}
 							wishlistActive={wishlistFilterActive}
 							onToggleWishlist={handleToggleWishlist}
-							wishlistCount={wishlistItems.length}
+							wishlistCount={matchedWishlistCount}
+							unreadNotifications={unreadNotifications}
 						/>
 						<View style={styles.titleRowMap}>
 							<Text style={[styles.title, { color: theme.text }]}>Discover</Text>
@@ -406,13 +460,15 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 							<View style={styles.filterBannerMap}>
 								<MaterialIcons name="favorite" size={12} color={theme.tint} />
 								<Text style={[styles.filterBannerText, { color: theme.tint }]}>
-									Wishlist matches only · {filteredSales.length} of {salesWithDistance.length}
+									{matchedSalesCount > 0
+										? `${matchedSalesCount} wishlist match${matchedSalesCount === 1 ? "" : "es"} within range`
+										: "No wishlist matches within range"}
 								</Text>
 							</View>
 						) : null}
 						{!loading && (
 							<StoriesBar
-								sales={filteredSales}
+								sales={displayedSales}
 								onStoryPress={handleStoryPress}
 							/>
 						)}
@@ -440,7 +496,8 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 				onToggleMode={setMode}
 				wishlistActive={wishlistFilterActive}
 				onToggleWishlist={handleToggleWishlist}
-				wishlistCount={wishlistItems.length}
+				wishlistCount={matchedWishlistCount}
+				unreadNotifications={unreadNotifications}
 			/>
 
 			<View style={styles.content}>
@@ -453,7 +510,9 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 					<View style={styles.filterBanner}>
 						<MaterialIcons name="favorite" size={14} color={theme.tint} />
 						<Text style={[styles.filterBannerText, { color: theme.tint }]}>
-							Wishlist matches only · {filteredSales.length} of {salesWithDistance.length}
+							{matchedSalesCount > 0
+										? `${matchedSalesCount} wishlist match${matchedSalesCount === 1 ? "" : "es"} within range`
+										: "No wishlist matches within range"}
 						</Text>
 						<TouchableOpacity
 							onPress={() => setWishlistFilterActive(false)}
@@ -466,7 +525,7 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 
 				{!loading && (
 					<StoriesBar
-						sales={filteredSales}
+						sales={displayedSales}
 						onStoryPress={handleStoryPress}
 					/>
 				)}
@@ -477,7 +536,7 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 					</View>
 				) : (
 					<FlatList
-						data={filteredSales}
+						data={displayedSales}
 						keyExtractor={(item) => item.id}
 						contentContainerStyle={{
 							paddingBottom: 120,
@@ -487,20 +546,17 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 							<SaleCard
 								sale={item}
 								distanceText={item._distanceText}
+								highlighted={wishlistFilterActive && item._isWishlistMatch}
 								onPress={() => router.push(`/sale-detail/${item.id}`)}
 							/>
 						)}
 						ListEmptyComponent={
 							<View style={styles.emptyWrap}>
 								<Text style={[styles.emptyText, { color: theme.secondaryText }]}>
-									{wishlistFilterActive
-										? "No sales match your wishlist yet."
-										: `No garage sales within ${radiusKm} km.`}
+									{`No garage sales within ${radiusKm} km.`}
 								</Text>
 								<Text style={[styles.emptyHint, { color: theme.secondaryText }]}>
-									{wishlistFilterActive
-										? "Try turning off the filter or adding more wishlist items."
-										: "Try increasing the distance or pull down to refresh."}
+									Try increasing the distance or pull down to refresh.
 								</Text>
 							</View>
 						}
