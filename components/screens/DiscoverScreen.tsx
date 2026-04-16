@@ -8,6 +8,7 @@ import {
 	ActivityIndicator,
 	FlatList,
 	Image,
+	Platform,
 	RefreshControl,
 	SafeAreaView,
 	StyleSheet,
@@ -15,7 +16,7 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
-import MapView, { Callout, Marker, Region } from "react-native-maps";
+import MapView, { Callout, Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
 
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
@@ -374,7 +375,7 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 				{/* Full-screen map behind everything */}
 				<MapView
 					ref={mapRef}
-					provider="google"
+					provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
 					style={StyleSheet.absoluteFill}
 					initialRegion={mapRegion}
 					showsUserLocation={true}
