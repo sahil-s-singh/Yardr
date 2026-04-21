@@ -11,7 +11,6 @@ import { sendWishlistMatchNotification } from '@/lib/wishlistNotifications';
  */
 export async function recheckSaleAgainstWishlists(garageSaleId: string): Promise<void> {
   try {
-    console.log(`Re-checking sale ${garageSaleId} against wishlists...`);
 
     // Step 1: Delete all existing matches for this sale
     const { error: deleteError } = await supabase
@@ -78,7 +77,6 @@ export async function recheckSaleAgainstWishlists(garageSaleId: string): Promise
       }
     }
 
-    console.log(`Finished re-checking sale ${garageSaleId}`);
   } catch (error) {
     console.error('Error in recheckSaleAgainstWishlists:', error);
   }

@@ -1,9 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Text, Alert } from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
-import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { ThemedText } from '@/components/themed-text';
 
 interface VideoRecorderProps {
@@ -17,16 +14,8 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
   const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const cameraRef = useRef<CameraView>(null);
-  const recordingTimeout = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (recordingTimeout.current) {
-        clearTimeout(recordingTimeout.current);
-      }
-    };
-  }, []);
 
   if (!permission) {
     return <View style={styles.container}><ThemedText>Loading...</ThemedText></View>;
@@ -43,31 +32,44 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
     );
   }
 
-  const startRecording = async () => {
-    if (!cameraRef.current) return;
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
-    try {
-      // 3-second countdown
-      for (let i = 3; i > 0; i--) {
-        setCountdown(i);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+  const startRecording = useCallback(() => {
+    if (!cameraRef.current || !cameraReady) return;
+
+    let count = 3;
+    setCountdown(count);
+
+    countdownRef.current = setInterval(() => {
+      count--;
+      if (count > 0) {
+        setCountdown(count);
+      } else {
+        // Countdown finished — start recording
+        if (countdownRef.current) clearInterval(countdownRef.current);
+        setCountdown(null);
+        setIsRecording(true);
+
+        cameraRef.current?.recordAsync({ maxDuration: 5 })
+          .then((video) => {
+            setIsRecording(false);
+            if (video) setRecordedVideo(video.uri);
+          })
+          .catch((error) => {
+            console.error('Error recording video:', error);
+            Alert.alert('Error', 'Failed to record video');
+            setIsRecording(false);
+          });
       }
-      setCountdown(null);
+    }, 1000);
+  }, [cameraReady]);
 
-      setIsRecording(true);
-
-      const video = await cameraRef.current.recordAsync({
-        maxDuration: 5,
-      });
-
-      setIsRecording(false);
-      setRecordedVideo(video.uri);
-    } catch (error) {
-      console.error('Error recording video:', error);
-      Alert.alert('Error', 'Failed to record video');
-      setIsRecording(false);
-    }
-  };
+  // Cleanup countdown on unmount
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
 
   const stopRecording = () => {
     if (cameraRef.current && isRecording) {
@@ -76,33 +78,8 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
   };
 
   const extractFrames = async (videoUri: string): Promise<string[]> => {
-    try {
-      // For simplicity, we'll use the video thumbnail as our frame
-      // In a production app, you'd extract multiple frames at different timestamps
-      const frames: string[] = [];
-
-      // Generate thumbnail (represents frame at 0s, 2s, and 4s)
-      // Since we can't easily extract frames in React Native without native modules,
-      // we'll take a screenshot approach or use the video itself
-
-      // For now, we'll return the video URI wrapped - Claude can handle video
-      // But since we need base64 images, let's create a placeholder
-      // In production, you'd use a library like react-native-video-processing
-
-      console.log('Video recorded at:', videoUri);
-
-      // Read video file and convert to base64
-      const base64 = await FileSystem.readAsStringAsync(videoUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      // For now, return empty array - we'll send the video URL instead
-      // You'll need to implement proper frame extraction
-      return [];
-    } catch (error) {
-      console.error('Error extracting frames:', error);
-      return [];
-    }
+    // Placeholder: in production we would extract frames at intervals
+    return [];
   };
 
   const handleUseVideo = async () => {
@@ -128,14 +105,11 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
   if (recordedVideo) {
     return (
       <View style={styles.container}>
-        <Video
-          source={{ uri: recordedVideo }}
-          style={styles.video}
-          useNativeControls
-          resizeMode={ResizeMode.CONTAIN}
-          isLooping
-          shouldPlay
-        />
+        <View style={styles.previewCenter}>
+          <ThemedText style={styles.previewCheck}>✓</ThemedText>
+          <ThemedText style={styles.previewTitle}>Video Recorded</ThemedText>
+          <ThemedText style={styles.previewSub}>5 second clip ready</ThemedText>
+        </View>
 
         {processing ? (
           <View style={styles.processingContainer}>
@@ -164,6 +138,7 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
         ref={cameraRef}
         facing="back"
         mode="video"
+        onCameraReady={() => setCameraReady(true)}
       >
         {countdown !== null && (
           <View style={styles.countdownContainer}>
@@ -202,7 +177,7 @@ export default function VideoRecorder({ onVideoRecorded, onCancel }: VideoRecord
             📹 Record a 5-second video (Optional)
           </ThemedText>
           <ThemedText style={styles.instructionsSubtext}>
-            AI will auto-fill your listing, or tap "Skip Video" to fill manually
+            AI will auto-fill your listing, or tap the Skip Video button to fill manually
           </ThemedText>
         </View>
       </CameraView>
@@ -218,8 +193,25 @@ const styles = StyleSheet.create({
   camera: {
     flex: 1,
   },
-  video: {
+  previewCenter: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewCheck: {
+    fontSize: 64,
+    color: '#4CD964',
+    marginBottom: 12,
+  },
+  previewTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  previewSub: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 6,
   },
   message: {
     textAlign: 'center',

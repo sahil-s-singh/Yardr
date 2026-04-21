@@ -6,8 +6,6 @@ export const videoService = {
   // Upload video to Supabase Storage and return public URL
   uploadVideo: async (videoUri: string): Promise<string> => {
     try {
-      console.log('Uploading video from:', videoUri);
-
       // Read video file as base64
       const base64 = await readAsStringAsync(videoUri, {
         encoding: EncodingType.Base64,
@@ -37,7 +35,6 @@ export const videoService = {
         .from('garage-sale-videos')
         .getPublicUrl(data.path);
 
-      console.log('Video uploaded successfully:', urlData.publicUrl);
       return urlData.publicUrl;
     } catch (error) {
       console.error('Error uploading video:', error);
@@ -63,7 +60,6 @@ export const videoService = {
         throw error;
       }
 
-      console.log('Video deleted successfully');
     } catch (error) {
       console.error('Error deleting video:', error);
       throw error;

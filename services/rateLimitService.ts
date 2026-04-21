@@ -1,104 +1,64 @@
-import { supabase } from '@/lib/supabase';
-import * as Device from 'expo-device';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Application from "expo-application";
 
-// Rate limiting configuration
-const MAX_POSTS_PER_DAY = 999; // Temporarily disabled for testing
-const MAX_POSTS_PER_HOUR = 999; // Temporarily disabled for testing
+const DEVICE_ID_KEY = "yardr_device_id_v1";
 
-export interface RateLimitCheck {
-  allowed: boolean;
-  message?: string;
-  postsToday: number;
-  postsThisHour: number;
+async function generateFallbackId() {
+	// App-scoped ID (stable per install)
+	if (Application.applicationId) {
+		return `app:${Application.applicationId}:${Date.now()}`;
+	}
+	return `anon:${Math.random().toString(36).slice(2)}`;
+}
+
+async function getDeviceId(): Promise<string> {
+	try {
+		// 1. Try cache
+		const cached = await AsyncStorage.getItem(DEVICE_ID_KEY);
+		if (cached) return cached;
+
+		// 2. Generate new ID
+		const newId = await generateFallbackId();
+
+		// 3. Persist
+		await AsyncStorage.setItem(DEVICE_ID_KEY, newId);
+
+		return newId;
+	} catch (e) {
+		console.warn("Device ID fallback used");
+		return `temp:${Date.now()}`;
+	}
+}
+
+async function checkRateLimit(): Promise<{
+	allowed: boolean;
+	message?: string;
+}> {
+	// Simple client-side rate limit: max 5 posts per day
+	try {
+		const key = "yardr_post_timestamps";
+		const raw = await AsyncStorage.getItem(key);
+		const timestamps: number[] = raw ? JSON.parse(raw) : [];
+
+		const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+		const recent = timestamps.filter((t) => t > oneDayAgo);
+
+		if (recent.length >= 5) {
+			return {
+				allowed: false,
+				message: "You can only post 5 sales per day. Please try again later.",
+			};
+		}
+
+		recent.push(Date.now());
+		await AsyncStorage.setItem(key, JSON.stringify(recent));
+		return { allowed: true };
+	} catch {
+		return { allowed: true };
+	}
 }
 
 export const rateLimitService = {
-  // Check if device can post based on rate limits
-  checkRateLimit: async (): Promise<RateLimitCheck> => {
-    try {
-      // Get unique device identifier
-      const deviceId = await getDeviceId();
-
-      const now = new Date();
-      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-
-      // Check posts in last 24 hours
-      const { data: dailyPosts, error: dailyError } = await supabase
-        .from('garage_sales')
-        .select('id, created_at')
-        .eq('device_id', deviceId)
-        .gte('created_at', oneDayAgo.toISOString());
-
-      if (dailyError) {
-        console.error('Error checking daily rate limit:', dailyError);
-        // Allow on error to not block legitimate users
-        return { allowed: true, postsToday: 0, postsThisHour: 0 };
-      }
-
-      const postsToday = dailyPosts?.length || 0;
-
-      // Check posts in last hour
-      const postsThisHour = dailyPosts?.filter(
-        post => new Date(post.created_at) >= oneHourAgo
-      ).length || 0;
-
-      // Check limits
-      if (postsToday >= MAX_POSTS_PER_DAY) {
-        return {
-          allowed: false,
-          message: `You've reached the daily limit of ${MAX_POSTS_PER_DAY} posts. Try again tomorrow.`,
-          postsToday,
-          postsThisHour,
-        };
-      }
-
-      if (postsThisHour >= MAX_POSTS_PER_HOUR) {
-        return {
-          allowed: false,
-          message: `You've posted ${postsThisHour} times in the last hour. Please wait before posting again.`,
-          postsToday,
-          postsThisHour,
-        };
-      }
-
-      return {
-        allowed: true,
-        postsToday,
-        postsThisHour,
-      };
-    } catch (error) {
-      console.error('Error in checkRateLimit:', error);
-      // Allow on error to not block legitimate users
-      return { allowed: true, postsToday: 0, postsThisHour: 0 };
-    }
-  },
-
-  // Get device ID for tracking
-  getDeviceId: async (): Promise<string> => {
-    return getDeviceId();
-  },
+	getDeviceId,
+	checkRateLimit,
 };
-
-// Helper function to get unique device identifier
-async function getDeviceId(): Promise<string> {
-  try {
-    // Try to get a unique device ID
-    const deviceId = await Device.getDeviceIdAsync();
-
-    if (deviceId) {
-      return deviceId;
-    }
-
-    // Fallback: create a composite ID from available device info
-    const deviceName = Device.deviceName || 'unknown';
-    const modelName = Device.modelName || 'unknown';
-    const osVersion = Device.osVersion || 'unknown';
-
-    return `${deviceName}-${modelName}-${osVersion}`;
-  } catch (error) {
-    console.error('Error getting device ID:', error);
-    // Ultimate fallback
-    return 'unknown-device';
-  }
-}

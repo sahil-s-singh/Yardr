@@ -106,7 +106,7 @@ export default function WishlistMatchesScreen() {
                 style={styles.matchCard}
                 onPress={() => {
                   // Navigate back to map and focus on this sale
-                  router.push(`/(tabs)/?saleId=${match.garage_sale_id}`);
+                  router.push(`/sale-detail/${match.garage_sale_id}` as any);
                 }}
               >
                 <View style={styles.matchHeader}>

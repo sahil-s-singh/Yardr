@@ -5,6 +5,23 @@ import { matchWishlistAgainstSale } from '@/lib/wishlistMatcher';
 import { sendWishlistMatchNotification } from '@/lib/wishlistNotifications';
 import { mapGarageSaleRow } from '@/lib/mappers';
 
+// Rate limit: max concurrent AI matching calls
+const MAX_CONCURRENT_MATCHES = 5;
+const MATCH_DELAY_MS = 200;
+
+async function rateLimitedMatchLoop<T>(
+  items: T[],
+  processFn: (item: T) => Promise<void>
+): Promise<void> {
+  for (let i = 0; i < items.length; i += MAX_CONCURRENT_MATCHES) {
+    const batch = items.slice(i, i + MAX_CONCURRENT_MATCHES);
+    await Promise.all(batch.map(processFn));
+    if (i + MAX_CONCURRENT_MATCHES < items.length) {
+      await new Promise(resolve => setTimeout(resolve, MATCH_DELAY_MS));
+    }
+  }
+}
+
 export const wishlistService = {
   /**
    * Add a new wishlist item
@@ -39,13 +56,14 @@ export const wishlistService = {
   /**
    * Get all wishlist items for a user
    */
-  getUserWishlistItems: async (userId: string): Promise<UserWishlistItem[]> => {
+  getUserWishlistItems: async (userId: string, limit = 50, offset = 0): Promise<UserWishlistItem[]> => {
     const { data, error } = await supabase
       .from('user_wishlists')
       .select('*')
       .eq('user_id', userId)
       .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
     return data || [];
@@ -84,7 +102,7 @@ export const wishlistService = {
   /**
    * Get matches for a specific wishlist item
    */
-  getMatchesForWishlistItem: async (wishlistItemId: string): Promise<WishlistMatchWithDetails[]> => {
+  getMatchesForWishlistItem: async (wishlistItemId: string, limit = 50, offset = 0): Promise<WishlistMatchWithDetails[]> => {
     const { data, error } = await supabase
       .from('wishlist_matches')
       .select(`
@@ -93,7 +111,8 @@ export const wishlistService = {
         user_wishlists (*)
       `)
       .eq('wishlist_item_id', wishlistItemId)
-      .order('matched_at', { ascending: false });
+      .order('matched_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
 
@@ -131,7 +150,7 @@ export const wishlistService = {
   /**
    * Get all matches for a user (across all wishlist items)
    */
-  getAllMatchesForUser: async (userId: string): Promise<WishlistMatchWithDetails[]> => {
+  getAllMatchesForUser: async (userId: string, limit = 50, offset = 0): Promise<WishlistMatchWithDetails[]> => {
     const { data, error } = await supabase
       .from('wishlist_matches')
       .select(`
@@ -140,7 +159,8 @@ export const wishlistService = {
         user_wishlists (*)
       `)
       .eq('user_id', userId)
-      .order('matched_at', { ascending: false });
+      .order('matched_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
 
@@ -202,11 +222,10 @@ async function checkWishlistItemAgainstExistingSales(
 
     if (salesError || !recentSales) return;
 
-    // Check each sale for matches
-    for (const sale of recentSales) {
+    // Check each sale for matches (rate-limited to avoid Claude API overload)
+    await rateLimitedMatchLoop(recentSales, async (sale) => {
       const matchResult = await matchWishlistAgainstSale(wishlistItem, sale);
       if (matchResult.isMatch) {
-        // Create match record
         await createMatchRecord(
           userId,
           wishlistItemId,
@@ -215,7 +234,7 @@ async function checkWishlistItemAgainstExistingSales(
           matchResult.reason
         );
       }
-    }
+    });
   } catch (error) {
     console.error('Error in checkWishlistItemAgainstExistingSales:', error);
   }
@@ -279,11 +298,10 @@ export async function checkNewSaleAgainstWishlists(garageSaleId: string): Promis
 
     if (wishlistError || !wishlists) return;
 
-    // Check each wishlist item
-    for (const wishlistItem of wishlists) {
+    // Check each wishlist item (rate-limited to avoid Claude API overload)
+    await rateLimitedMatchLoop(wishlists, async (wishlistItem) => {
       const matchResult = await matchWishlistAgainstSale(wishlistItem, garageSale);
       if (matchResult.isMatch) {
-        // Create match record (will trigger notification)
         await createMatchRecord(
           wishlistItem.user_id,
           wishlistItem.id,
@@ -292,7 +310,7 @@ export async function checkNewSaleAgainstWishlists(garageSaleId: string): Promis
           matchResult.reason
         );
       }
-    }
+    });
   } catch (error) {
     console.error('Error in checkNewSaleAgainstWishlists:', error);
   }
