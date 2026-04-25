@@ -14,7 +14,6 @@ const TABS = [
 	{ key: "index", icon: "home" as const, route: "/(tabs)" },
 	{ key: "wishlists", icon: "local-offer" as const, route: "/wishlists" },
 	{ key: "sell", icon: "add" as const, route: "/sell" },
-	{ key: "search", icon: "search" as const, route: "/(tabs)/search" },
 	{ key: "profile", icon: "person-outline" as const, route: "/(tabs)/profile" },
 ];
 
@@ -29,7 +28,6 @@ export default function CustomTabBar() {
 		if (pathname === "/" || pathname === "/index") return "index";
 		if (pathname.startsWith("/wishlist")) return "wishlists";
 		if (pathname === "/profile") return "profile";
-		if (pathname === "/search") return "search";
 		if (pathname.startsWith("/sell")) return "sell";
 		return "index";
 	};

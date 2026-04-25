@@ -14,7 +14,6 @@ export default function TabLayout() {
 			>
 				<Tabs.Screen name="index" options={{ title: "Home" }} />
 				<Tabs.Screen name="map" options={{ title: "Map" }} />
-				<Tabs.Screen name="search" options={{ title: "Search" }} />
 				<Tabs.Screen name="profile" options={{ title: "Profile" }} />
 			</Tabs>
 			<CustomTabBar />

@@ -13,7 +13,6 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-	Alert,
 	SafeAreaView,
 	ScrollView,
 	StyleSheet,
@@ -22,23 +21,16 @@ import {
 	View,
 } from "react-native";
 
-const showComingSoon = (feature: string) => {
-	Alert.alert("Coming soon!", `${feature} feature is coming soon.`, [
-		{ text: "OK" },
-	]);
-};
-
 type MenuItemType = {
 	label: string;
 	icon: keyof typeof MaterialIcons.glyphMap;
-	route: string | null;
+	route: string;
 	color: string;
 };
 
 const menuItems: MenuItemType[] = [
 	{ label: "Wishlist", icon: "local-offer", route: "/wishlists", color: Accent.peach },
 	{ label: "Notifications", icon: "notifications-none", route: "/notifications", color: Accent.gold },
-	{ label: "Settings", icon: "settings", route: null, color: Accent.indigo },
 ];
 
 export default function ProfileScreen() {
@@ -180,11 +172,7 @@ export default function ProfileScreen() {
 						<TouchableOpacity
 							key={item.label}
 							style={[styles.menuTile, { backgroundColor: theme.card }]}
-							onPress={() =>
-								item.route
-									? router.push(item.route as any)
-									: showComingSoon(item.label)
-							}
+							onPress={() => router.push(item.route as any)}
 							activeOpacity={0.85}
 						>
 							<MaterialIcons name={item.icon} size={20} color={item.color} />
