@@ -1,13 +1,12 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Platform } from 'react-native';
-import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import { authService } from '@/services/authService';
-import { UserProfile } from '@/types/user';
 import { garageSaleService } from '@/services/garageSaleService';
 import { rateLimitService } from '@/services/rateLimitService';
-import { supabase } from '@/lib/supabase';
-import * as Notifications from 'expo-notifications';
+import { UserProfile } from '@/types/user';
+import { Session, User } from '@supabase/supabase-js';
 import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface AuthContextType {
   session: Session | null;
@@ -50,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (session?.user) {
         loadUserProfile(session.user.id);
+        registerPushToken(session.user.id);
       } else {
         setUserProfile(null);
       }
@@ -78,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (newStatus !== 'granted') return;
       }
       const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: process.env.EXPO_PUBLIC_PROJECT_ID,
+        projectId: 'f9805b98-5747-42cd-bc89-11e9a70bbd08',
       });
       await supabase
         .from('user_profiles')

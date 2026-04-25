@@ -11,10 +11,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.sahil.yardr",
+      "appleTeamId": "ZY62AH6W62",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "5"
+      "buildNumber": "7"
     },
     "android": {
       "adaptiveIcon": {
