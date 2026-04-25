@@ -146,7 +146,7 @@ export default function PublishSaleScreen() {
 					startTime,
 					endTime,
 					contactName: user?.user_metadata?.display_name || "Seller",
-					contactPhone: undefined,
+					contactPhone: draft.contactPhone?.trim() || undefined,
 					contactEmail: user?.email || undefined,
 					videoUrl,
 					images: draft.photos || undefined,
@@ -232,6 +232,9 @@ export default function PublishSaleScreen() {
 					label="Address"
 					value={draft.addressLine || "No address set"}
 				/>
+				{draft.contactPhone?.trim() ? (
+					<SummaryCard label="Phone" value={draft.contactPhone.trim()} />
+				) : null}
 				<SummaryCard
 					label="Description"
 					value={draft.description || "No description"}

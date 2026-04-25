@@ -364,7 +364,6 @@ export default function ViewSaleScreen() {
 								<Text style={styles.hostName}>
 									Hosted by {sale.contactName}
 								</Text>
-								<Text style={styles.hostRole}>Verified seller</Text>
 							</View>
 							{sale.contactPhone && (
 								<View style={styles.hostActions}>
@@ -588,11 +587,6 @@ const styles = StyleSheet.create({
 		fontWeight: "600",
 		color: "#23201C",
 		marginBottom: 2,
-	},
-	hostRole: {
-		fontSize: 13,
-		color: "#807A73",
-		fontWeight: "500",
 	},
 	hostActions: {
 		flexDirection: "row",

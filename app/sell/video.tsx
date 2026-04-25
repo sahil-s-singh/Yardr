@@ -89,6 +89,7 @@ export default function ReviewScreen() {
 	const [description, setDescription] = useState("");
 	const [categories, setCategories] = useState<string[]>([]);
 	const [addressLine, setAddressLine] = useState("");
+	const [contactPhone, setContactPhone] = useState("");
 	const [coords, setCoords] = useState<{
 		latitude: number;
 		longitude: number;
@@ -149,6 +150,7 @@ export default function ReviewScreen() {
 					}
 					if (draft.startTime) setStartTime(draft.startTime);
 					if (draft.endTime) setEndTime(draft.endTime);
+					if (draft.contactPhone) setContactPhone(draft.contactPhone);
 				}
 
 				if (videoUri) {
@@ -178,8 +180,9 @@ export default function ReviewScreen() {
 			endDate: yyyyMmDd(endDate),
 			startTime,
 			endTime,
+			contactPhone: contactPhone.trim() || undefined,
 		}).catch(() => {});
-	}, [loading, videoUri, title, description, categories, addressLine, coords, startDate, endDate, startTime, endTime]);
+	}, [loading, videoUri, title, description, categories, addressLine, coords, startDate, endDate, startTime, endTime, contactPhone]);
 
 	// Auto-detect location
 	useEffect(() => {
@@ -431,6 +434,20 @@ export default function ReviewScreen() {
 						}}
 						inputStyle={styles.glassInput}
 						biasCoords={coords}
+					/>
+				</View>
+
+				<View style={styles.fieldGroup}>
+					<Text style={styles.label}>Phone (optional)</Text>
+					<TextInput
+						style={styles.glassInput}
+						value={contactPhone}
+						onChangeText={setContactPhone}
+						placeholder="(306) 555-1234"
+						placeholderTextColor="#807A73"
+						keyboardType="phone-pad"
+						autoComplete="tel"
+						textContentType="telephoneNumber"
 					/>
 				</View>
 

@@ -14,6 +14,7 @@ export type SellDraft = {
 	endDate?: string;
 	startTime?: string;
 	endTime?: string;
+	contactPhone?: string;
 	updatedAt?: number;
 };
 
