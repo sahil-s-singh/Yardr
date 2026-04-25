@@ -4,6 +4,7 @@ import GradientBackground from "@/components/ui/GradientBackground";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { analyzeGarageSaleVideo } from "@/lib/claude";
 import { loadSellDraft, saveSellDraft } from "@/lib/draftSale";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { MaterialIcons } from "@expo/vector-icons";
 import { EncodingType, readAsStringAsync } from "expo-file-system/legacy";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -23,6 +24,46 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
+
+function yyyyMmDd(d: Date) {
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, "0");
+	const day = String(d.getDate()).padStart(2, "0");
+	return `${y}-${m}-${day}`;
+}
+
+function hhmm(d: Date) {
+	const h = String(d.getHours()).padStart(2, "0");
+	const m = String(d.getMinutes()).padStart(2, "0");
+	return `${h}:${m}`;
+}
+
+function getNextSaturday(): Date {
+	const today = new Date();
+	const dayOfWeek = today.getDay();
+	const daysUntilSaturday = (6 - dayOfWeek + 7) % 7 || 7;
+	const d = new Date(today);
+	d.setDate(today.getDate() + daysUntilSaturday);
+	d.setHours(10, 0, 0, 0);
+	return d;
+}
+
+function prettyDate(d: Date) {
+	return d.toLocaleDateString("en-US", {
+		weekday: "short",
+		month: "short",
+		day: "numeric",
+	});
+}
+
+function prettyTime(hhmmStr: string) {
+	const [hStr, mStr] = hhmmStr.split(":");
+	const h = parseInt(hStr, 10);
+	const m = parseInt(mStr, 10);
+	const period = h >= 12 ? "PM" : "AM";
+	const h12 = h % 12 || 12;
+	return m === 0 ? `${h12} ${period}` : `${h12}:${mStr} ${period}`;
+}
 
 function formatAddress(p: Location.LocationGeocodedAddress | undefined) {
 	if (!p) return "";
@@ -53,6 +94,30 @@ export default function ReviewScreen() {
 		longitude: number;
 	} | null>(null);
 
+	const defaultStart = useMemo(() => getNextSaturday(), []);
+	const [startDate, setStartDate] = useState<Date>(defaultStart);
+	const [endDate, setEndDate] = useState<Date>(defaultStart);
+	const [startTime, setStartTime] = useState("10:00");
+	const [endTime, setEndTime] = useState("14:00");
+	const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+	const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+	const [showStartPicker, setShowStartPicker] = useState(false);
+	const [showEndPicker, setShowEndPicker] = useState(false);
+
+	const startTimeDate = useMemo(() => {
+		const d = new Date(startDate);
+		const [h, m] = startTime.split(":").map(Number);
+		d.setHours(h, m, 0, 0);
+		return d;
+	}, [startDate, startTime]);
+
+	const endTimeDate = useMemo(() => {
+		const d = new Date(startDate);
+		const [h, m] = endTime.split(":").map(Number);
+		d.setHours(h, m, 0, 0);
+		return d;
+	}, [startDate, endTime]);
+
 	useEffect(() => {
 		let mounted = true;
 
@@ -74,6 +139,16 @@ export default function ReviewScreen() {
 							longitude: draft.coords.longitude,
 						});
 					}
+					if (draft.startDate) {
+						const parsed = new Date(draft.startDate + "T00:00:00");
+						if (!isNaN(parsed.getTime())) setStartDate(parsed);
+					}
+					if (draft.endDate) {
+						const parsed = new Date(draft.endDate + "T00:00:00");
+						if (!isNaN(parsed.getTime())) setEndDate(parsed);
+					}
+					if (draft.startTime) setStartTime(draft.startTime);
+					if (draft.endTime) setEndTime(draft.endTime);
 				}
 
 				if (videoUri) {
@@ -99,8 +174,12 @@ export default function ReviewScreen() {
 			categories,
 			addressLine,
 			coords: coords ?? undefined,
+			startDate: yyyyMmDd(startDate),
+			endDate: yyyyMmDd(endDate),
+			startTime,
+			endTime,
 		}).catch(() => {});
-	}, [loading, videoUri, title, description, categories, addressLine, coords]);
+	}, [loading, videoUri, title, description, categories, addressLine, coords, startDate, endDate, startTime, endTime]);
 
 	// Auto-detect location
 	useEffect(() => {
@@ -248,6 +327,99 @@ export default function ReviewScreen() {
 					/>
 				</View>
 
+				<View style={styles.timeRow}>
+					<View style={[styles.fieldGroup, styles.timeCol]}>
+						<Text style={styles.label}>Start Date</Text>
+						<TouchableOpacity
+							style={styles.glassInput}
+							onPress={() => setShowStartDatePicker(true)}
+						>
+							<Text style={styles.pickerValue}>{prettyDate(startDate)}</Text>
+						</TouchableOpacity>
+					</View>
+
+					<View style={[styles.fieldGroup, styles.timeCol]}>
+						<Text style={styles.label}>End Date</Text>
+						<TouchableOpacity
+							style={styles.glassInput}
+							onPress={() => setShowEndDatePicker(true)}
+						>
+							<Text style={styles.pickerValue}>{prettyDate(endDate)}</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+
+				<View style={styles.timeRow}>
+					<View style={[styles.fieldGroup, styles.timeCol]}>
+						<Text style={styles.label}>Start Time</Text>
+						<TouchableOpacity
+							style={styles.glassInput}
+							onPress={() => setShowStartPicker(true)}
+						>
+							<Text style={styles.pickerValue}>{prettyTime(startTime)}</Text>
+						</TouchableOpacity>
+					</View>
+
+					<View style={[styles.fieldGroup, styles.timeCol]}>
+						<Text style={styles.label}>End Time</Text>
+						<TouchableOpacity
+							style={styles.glassInput}
+							onPress={() => setShowEndPicker(true)}
+						>
+							<Text style={styles.pickerValue}>{prettyTime(endTime)}</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+
+				<DateTimePickerModal
+					isVisible={showStartDatePicker}
+					mode="date"
+					date={startDate}
+					minimumDate={new Date()}
+					onConfirm={(d) => {
+						setShowStartDatePicker(false);
+						setStartDate(d);
+						if (endDate < d) setEndDate(d);
+					}}
+					onCancel={() => setShowStartDatePicker(false)}
+					display="inline"
+				/>
+
+				<DateTimePickerModal
+					isVisible={showEndDatePicker}
+					mode="date"
+					date={endDate}
+					minimumDate={startDate}
+					onConfirm={(d) => {
+						setShowEndDatePicker(false);
+						setEndDate(d);
+					}}
+					onCancel={() => setShowEndDatePicker(false)}
+					display="inline"
+				/>
+
+				<DateTimePickerModal
+					isVisible={showStartPicker}
+					mode="time"
+					date={startTimeDate}
+					onConfirm={(d) => {
+						setShowStartPicker(false);
+						setStartTime(hhmm(d));
+					}}
+					onCancel={() => setShowStartPicker(false)}
+				/>
+
+				<DateTimePickerModal
+					isVisible={showEndPicker}
+					mode="time"
+					date={endTimeDate}
+					onConfirm={(d) => {
+						setShowEndPicker(false);
+						setEndTime(hhmm(d));
+					}}
+					onCancel={() => setShowEndPicker(false)}
+				/>
+
 				<View style={styles.fieldGroup}>
 					<Text style={styles.label}>Address</Text>
 					<AddressAutocomplete
@@ -354,6 +526,18 @@ const styles = StyleSheet.create({
 	textArea: {
 		minHeight: 80,
 		textAlignVertical: "top",
+	},
+	pickerValue: {
+		fontSize: 15,
+		color: "#23201C",
+		fontWeight: "600",
+	},
+	timeRow: {
+		flexDirection: "row",
+		gap: 12,
+	},
+	timeCol: {
+		flex: 1,
 	},
 
 	ctaBtn: {

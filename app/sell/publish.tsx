@@ -55,6 +55,15 @@ function prettyDate(dateStr: string) {
 	});
 }
 
+function prettyTime(hhmmStr: string) {
+	const [hStr, mStr] = hhmmStr.split(":");
+	const h = parseInt(hStr, 10);
+	const m = parseInt(mStr, 10);
+	const period = h >= 12 ? "PM" : "AM";
+	const h12 = h % 12 || 12;
+	return m === 0 ? `${h12} ${period}` : `${h12}:${mStr} ${period}`;
+}
+
 function SummaryCard({
 	label,
 	value,
@@ -93,9 +102,12 @@ export default function PublishSaleScreen() {
 	}, [user]);
 
 	const startDate = useMemo(() => {
-		const nextSat = getNextSaturday();
-		return yyyyMmDd(nextSat);
-	}, []);
+		return draft?.startDate || yyyyMmDd(getNextSaturday());
+	}, [draft?.startDate]);
+
+	const endDate = draft?.endDate || startDate;
+	const startTime = draft?.startTime || "10:00";
+	const endTime = draft?.endTime || "14:00";
 
 	const handlePublish = async () => {
 		if (!draft) return;
@@ -106,9 +118,6 @@ export default function PublishSaleScreen() {
 			const deviceId = `device-${Date.now()}-${Math.random()
 				.toString(36)
 				.substr(2, 9)}`;
-
-			const startTime = "10:00";
-			const endTime = "14:00";
 
 			// Upload video to Supabase Storage if we have one
 			let videoUrl: string | undefined;
@@ -133,7 +142,7 @@ export default function PublishSaleScreen() {
 					},
 					date: startDate,
 					startDate: startDate,
-					endDate: startDate,
+					endDate: endDate,
 					startTime,
 					endTime,
 					contactName: user?.user_metadata?.display_name || "Seller",
@@ -213,7 +222,11 @@ export default function PublishSaleScreen() {
 				<SummaryCard label="Title" value={draft.title || "Untitled"} />
 				<SummaryCard
 					label="Date"
-					value={`${prettyDate(startDate)}  \u2022  10 AM - 2 PM`}
+					value={
+						endDate && endDate !== startDate
+							? `${prettyDate(startDate)} – ${prettyDate(endDate)}  \u2022  ${prettyTime(startTime)} - ${prettyTime(endTime)}`
+							: `${prettyDate(startDate)}  \u2022  ${prettyTime(startTime)} - ${prettyTime(endTime)}`
+					}
 				/>
 				<SummaryCard
 					label="Address"

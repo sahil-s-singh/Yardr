@@ -10,6 +10,10 @@ export type SellDraft = {
 	addressLine?: string;
 	categories?: string[];
 	coords?: { latitude: number; longitude: number };
+	startDate?: string;
+	endDate?: string;
+	startTime?: string;
+	endTime?: string;
 	updatedAt?: number;
 };
 
