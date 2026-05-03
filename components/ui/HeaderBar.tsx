@@ -29,17 +29,29 @@ export default function HeaderBar({
 
 	return (
 		<View style={styles.wrap}>
-			{/* Left — tiny Map/List switch */}
+			{/* Left — Map/List segmented switch */}
 			{mode && onToggleMode ? (
 				<View style={[styles.switchTrack, { backgroundColor: theme.muted }]}>
 					<TouchableOpacity
 						style={[
 							styles.switchPill,
-							mode === "map" && { backgroundColor: theme.card },
+							mode === "map" && [
+								styles.switchPillActive,
+								{ backgroundColor: theme.card },
+							],
 						]}
-						activeOpacity={0.8}
+						activeOpacity={0.85}
 						onPress={() => onToggleMode("map")}
+						hitSlop={10}
+						accessibilityRole="button"
+						accessibilityLabel="Switch to map view"
+						accessibilityState={{ selected: mode === "map" }}
 					>
+						<MaterialIcons
+							name="map"
+							size={12}
+							color={mode === "map" ? theme.tint : theme.secondaryText}
+						/>
 						<Text
 							style={[
 								styles.switchLabel,
@@ -52,11 +64,23 @@ export default function HeaderBar({
 					<TouchableOpacity
 						style={[
 							styles.switchPill,
-							mode === "list" && { backgroundColor: theme.card },
+							mode === "list" && [
+								styles.switchPillActive,
+								{ backgroundColor: theme.card },
+							],
 						]}
-						activeOpacity={0.8}
+						activeOpacity={0.85}
 						onPress={() => onToggleMode("list")}
+						hitSlop={10}
+						accessibilityRole="button"
+						accessibilityLabel="Switch to list view"
+						accessibilityState={{ selected: mode === "list" }}
 					>
+						<MaterialIcons
+							name="view-list"
+							size={12}
+							color={mode === "list" ? theme.tint : theme.secondaryText}
+						/>
 						<Text
 							style={[
 								styles.switchLabel,
@@ -154,13 +178,24 @@ const styles = StyleSheet.create({
 		padding: 2,
 	},
 	switchPill: {
-		paddingVertical: 2,
-		paddingHorizontal: 6,
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 3,
+		paddingVertical: 4,
+		paddingHorizontal: 7,
 		borderRadius: 6,
+		minHeight: 22,
+	},
+	switchPillActive: {
+		shadowColor: "#000",
+		shadowOpacity: 0.06,
+		shadowRadius: 2,
+		shadowOffset: { width: 0, height: 1 },
+		elevation: 1,
 	},
 	switchLabel: {
-		fontSize: 10,
-		fontWeight: "600",
+		fontSize: 11,
+		fontWeight: "700",
 	},
 	center: {
 		position: "absolute",

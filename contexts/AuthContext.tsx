@@ -29,8 +29,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('[AuthContext] mount — calling getSession()');
     // Get initial session
     authService.getSession().then((session) => {
+      console.log('[AuthContext] getSession resolved:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        expiresAt: session?.expires_at,
+      });
       setSession(session);
       setUser(session?.user || null);
 
@@ -44,6 +50,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Listen for auth changes
     const subscription = authService.onAuthStateChange((session) => {
+      console.log('[AuthContext] onAuthStateChange:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+      });
       setSession(session);
       setUser(session?.user || null);
 

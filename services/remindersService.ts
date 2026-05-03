@@ -41,8 +41,11 @@ export const remindersService = {
     reminderTime: Date,
     garageSaleTitle: string
   ): Promise<UserReminder> => {
+    console.log('[remindersService.setReminder] start', { userId, garageSaleId, reminderTime: reminderTime.toISOString() });
     const pushToken = await remindersService.getPushToken();
+    console.log('[remindersService.setReminder] pushToken:', pushToken);
 
+    console.log('[remindersService.setReminder] inserting into user_reminders...');
     const { data, error } = await supabase
       .from('user_reminders')
       .insert([
@@ -56,7 +59,11 @@ export const remindersService = {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[remindersService.setReminder] supabase insert error:', error);
+      throw error;
+    }
+    console.log('[remindersService.setReminder] insert OK, row:', data);
 
     // Schedule local notification as a fallback
     try {
@@ -72,6 +79,7 @@ export const remindersService = {
           date: reminderTime,
         },
       });
+      console.log('[remindersService.setReminder] scheduled local notification id:', notificationId);
 
       // Store notification ID so we can cancel it later
       await supabase
@@ -79,7 +87,7 @@ export const remindersService = {
         .update({ local_notification_id: notificationId })
         .eq('id', data.id);
     } catch (notifError) {
-      console.error('Error scheduling notification:', notifError);
+      console.error('[remindersService.setReminder] Error scheduling notification:', notifError);
       // Don't throw - the reminder is still saved in the database
     }
 

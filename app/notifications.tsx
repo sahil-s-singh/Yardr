@@ -7,6 +7,7 @@ import {
 	notificationHistory,
 } from "@/lib/notificationHistory";
 import { MaterialIcons } from "@expo/vector-icons";
+import * as Notifications from "expo-notifications";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -47,6 +48,23 @@ export default function NotificationsScreen() {
 	const load = useCallback(async () => {
 		setLoading(true);
 		try {
+			try {
+				const presented = await Notifications.getPresentedNotificationsAsync();
+				const existing = await notificationHistory.list();
+				const known = new Set(existing.map((n) => n.id));
+				for (const n of presented) {
+					if (known.has(n.request.identifier)) continue;
+					await notificationHistory.append({
+						id: n.request.identifier,
+						title: n.request.content.title ?? "Notification",
+						body: n.request.content.body ?? "",
+						data:
+							(n.request.content.data as Record<string, any>) ?? undefined,
+					});
+				}
+			} catch (err) {
+				console.error("Failed to backfill presented notifications:", err);
+			}
 			const list = await notificationHistory.list();
 			setItems(list);
 		} finally {

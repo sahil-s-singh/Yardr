@@ -13,6 +13,8 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
+	ActivityIndicator,
+	Image,
 	SafeAreaView,
 	ScrollView,
 	StyleSheet,
@@ -31,10 +33,11 @@ type MenuItemType = {
 const menuItems: MenuItemType[] = [
 	{ label: "Wishlist", icon: "local-offer", route: "/wishlists", color: Accent.peach },
 	{ label: "Notifications", icon: "notifications-none", route: "/notifications", color: Accent.gold },
+	{ label: "Settings", icon: "settings", route: "/settings", color: Accent.indigo },
 ];
 
 export default function ProfileScreen() {
-	const { user, signOut } = useAuth();
+	const { user, userProfile, signOut, loading: authLoading } = useAuth();
 	const colorScheme = useColorScheme();
 	const theme = Colors[colorScheme ?? "light"];
 
@@ -66,6 +69,18 @@ export default function ProfileScreen() {
 			}
 		}, [user])
 	);
+
+	// LOADING SESSION (prevents brief "signed out" flash on cold start while AsyncStorage rehydrates)
+	if (authLoading) {
+		return (
+			<SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+				<GradientBackground />
+				<View style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
+					<ActivityIndicator color={theme.tint} />
+				</View>
+			</SafeAreaView>
+		);
+	}
 
 	// LOGGED OUT
 	if (!user) {
@@ -120,10 +135,16 @@ export default function ProfileScreen() {
 	}
 
 	// LOGGED IN
-	const stats = [
-		{ label: "Sales", value: String(salesCount), icon: "style" as const, color: theme.tint },
-		{ label: "Saved", value: String(savedCount), icon: "favorite" as const, color: Accent.sage },
-		{ label: "Reminders", value: String(remindersCount), icon: "notifications" as const, color: Accent.indigo },
+	const stats: {
+		label: string;
+		value: string;
+		icon: keyof typeof MaterialIcons.glyphMap;
+		color: string;
+		route?: string;
+	}[] = [
+		{ label: "Sales", value: String(salesCount), icon: "style", color: theme.tint },
+		{ label: "Saved", value: String(savedCount), icon: "favorite", color: Accent.sage, route: "/favorites" },
+		{ label: "Reminders", value: String(remindersCount), icon: "notifications", color: Accent.indigo, route: "/reminders" },
 	];
 
 	return (
@@ -135,13 +156,20 @@ export default function ProfileScreen() {
 			>
 				{/* Profile Card */}
 				<View style={[styles.card, { backgroundColor: theme.card }]}>
-					<View
-						style={[styles.avatarLarge, { backgroundColor: theme.muted }]}
-					>
-						<MaterialIcons name="person" size={36} color={theme.secondaryText} />
-					</View>
+					{userProfile?.avatar_url ? (
+						<Image
+							source={{ uri: userProfile.avatar_url }}
+							style={styles.avatarLarge}
+						/>
+					) : (
+						<View
+							style={[styles.avatarLarge, { backgroundColor: theme.muted }]}
+						>
+							<MaterialIcons name="person" size={36} color={theme.secondaryText} />
+						</View>
+					)}
 					<Text style={[styles.name, { color: theme.text }]}>
-						{user.user_metadata?.display_name || "User"}
+						{userProfile?.display_name || user.user_metadata?.display_name || "User"}
 					</Text>
 					<Text style={[styles.email, { color: theme.secondaryText }]}>
 						{user.email}
@@ -150,20 +178,27 @@ export default function ProfileScreen() {
 
 				{/* Stats Row */}
 				<View style={styles.stats}>
-					{stats.map((s) => (
-						<View
-							key={s.label}
-							style={[styles.stat, { backgroundColor: theme.card }]}
-						>
-							<MaterialIcons name={s.icon} size={20} color={s.color} />
-							<Text style={[styles.statValue, { color: s.color }]}>
-								{s.value}
-							</Text>
-							<Text style={[styles.statLabel, { color: theme.secondaryText }]}>
-								{s.label}
-							</Text>
-						</View>
-					))}
+					{stats.map((s) => {
+						const Wrapper: any = s.route ? TouchableOpacity : View;
+						const wrapperProps = s.route
+							? { onPress: () => router.push(s.route as any), activeOpacity: 0.85 }
+							: {};
+						return (
+							<Wrapper
+								key={s.label}
+								style={[styles.stat, { backgroundColor: theme.card }]}
+								{...wrapperProps}
+							>
+								<MaterialIcons name={s.icon} size={20} color={s.color} />
+								<Text style={[styles.statValue, { color: s.color }]}>
+									{s.value}
+								</Text>
+								<Text style={[styles.statLabel, { color: theme.secondaryText }]}>
+									{s.label}
+								</Text>
+							</Wrapper>
+						);
+					})}
 				</View>
 
 				{/* Menu Grid */}

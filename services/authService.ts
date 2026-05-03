@@ -155,4 +155,12 @@ export const authService = {
     });
     if (error) throw error;
   },
+
+  /**
+   * Update email — triggers Supabase confirmation email
+   */
+  updateEmail: async (newEmail: string) => {
+    const { error } = await supabase.auth.updateUser({ email: newEmail });
+    if (error) throw error;
+  },
 };

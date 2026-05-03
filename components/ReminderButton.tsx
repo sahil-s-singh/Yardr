@@ -2,7 +2,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Platform, StyleSheet, Text, TouchableOpacity } from "react-native";
+import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -50,7 +50,15 @@ export default function ReminderButton({
 	}, [isAuthenticated, user, garageSaleId]);
 
 	const handlePress = async () => {
+		console.log("[ReminderButton] handlePress", {
+			isAuthenticated,
+			userId: user?.id,
+			loading,
+			hasReminder,
+			garageSaleId,
+		});
 		if (!isAuthenticated) {
+			console.log("[ReminderButton] not authenticated -> sign in prompt");
 			showSignInPrompt(
 				router,
 				"Please sign in to set reminders for garage sales",
@@ -58,9 +66,13 @@ export default function ReminderButton({
 			);
 			return;
 		}
-		if (!user || loading) return;
+		if (!user || loading) {
+			console.log("[ReminderButton] no user or already loading, bailing");
+			return;
+		}
 
 		if (hasReminder) {
+			console.log("[ReminderButton] reminder already exists -> remove flow");
 			showConfirm(
 				"Remove this reminder?",
 				async () => {
@@ -82,7 +94,9 @@ export default function ReminderButton({
 			return;
 		}
 
+		console.log("[ReminderButton] requesting notification permissions...");
 		const hasPermission = await remindersService.requestPermissions();
+		console.log("[ReminderButton] permission result:", hasPermission);
 		if (!hasPermission) {
 			showInfo(
 				"Please enable notifications in your device settings to set reminders",
@@ -93,6 +107,7 @@ export default function ReminderButton({
 
 		const saleDate = new Date(garageSaleDate);
 		const oneDayBefore = new Date(saleDate.getTime() - 24 * 60 * 60 * 1000);
+		console.log("[ReminderButton] opening date picker, default:", oneDayBefore.toISOString());
 		setSelectedDate(oneDayBefore);
 		setShowDatePicker(true);
 	};
@@ -114,20 +129,26 @@ export default function ReminderButton({
 	};
 
 	const confirmReminder = async (date: Date) => {
-		if (!user) return;
+		console.log("[ReminderButton] confirmReminder called with:", date.toISOString());
+		if (!user) {
+			console.log("[ReminderButton] no user in confirmReminder, bailing");
+			return;
+		}
 		setLoading(true);
 		setShowDatePicker(false);
 		try {
-			await remindersService.setReminder(
+			console.log("[ReminderButton] calling setReminder...");
+			const result = await remindersService.setReminder(
 				user.id,
 				garageSaleId,
 				date,
 				garageSaleTitle,
 			);
+			console.log("[ReminderButton] setReminder success:", result);
 			setHasReminder(true);
 			showSuccess(`Reminder set for ${date.toLocaleString()}`);
 		} catch (error: any) {
-			console.error("Error setting reminder:", error);
+			console.error("[ReminderButton] Error setting reminder:", error?.message, error);
 			showError("Failed to set reminder");
 		} finally {
 			setLoading(false);
@@ -155,24 +176,48 @@ export default function ReminderButton({
 				)}
 			</TouchableOpacity>
 
-			{showDatePicker && (
-				<>
-					<DateTimePicker
-						value={selectedDate}
-						mode="datetime"
-						display={Platform.OS === "ios" ? "spinner" : "default"}
-						onChange={handleDateChange}
-						minimumDate={new Date()}
-					/>
-					{Platform.OS === "ios" && (
-						<TouchableOpacity
-							style={styles.iosConfirmButton}
-							onPress={() => confirmReminder(selectedDate)}
-						>
-							<Text style={styles.iosConfirmText}>Set Reminder</Text>
-						</TouchableOpacity>
-					)}
-				</>
+			{showDatePicker && Platform.OS === "ios" && (
+				<Modal
+					visible={showDatePicker}
+					transparent
+					animationType="slide"
+					onRequestClose={() => setShowDatePicker(false)}
+				>
+					<View style={styles.modalBackdrop}>
+						<View style={styles.modalSheet}>
+							<View style={styles.modalHeader}>
+								<TouchableOpacity onPress={() => setShowDatePicker(false)}>
+									<Text style={styles.modalCancel}>Cancel</Text>
+								</TouchableOpacity>
+								<Text style={styles.modalTitle}>Set reminder</Text>
+								<View style={{ width: 60 }} />
+							</View>
+							<DateTimePicker
+								value={selectedDate}
+								mode="datetime"
+								display="spinner"
+								onChange={handleDateChange}
+								minimumDate={new Date()}
+								style={styles.iosPicker}
+							/>
+							<TouchableOpacity
+								style={styles.iosConfirmButton}
+								onPress={() => confirmReminder(selectedDate)}
+							>
+								<Text style={styles.iosConfirmText}>Set Reminder</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+				</Modal>
+			)}
+			{showDatePicker && Platform.OS === "android" && (
+				<DateTimePicker
+					value={selectedDate}
+					mode="datetime"
+					display="default"
+					onChange={handleDateChange}
+					minimumDate={new Date()}
+				/>
 			)}
 		</>
 	);
@@ -217,5 +262,40 @@ const styles = StyleSheet.create({
 		color: "#fff",
 		fontSize: 16,
 		fontWeight: "800",
+	},
+	modalBackdrop: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.4)",
+		justifyContent: "flex-end",
+	},
+	modalSheet: {
+		backgroundColor: "#fff",
+		borderTopLeftRadius: 20,
+		borderTopRightRadius: 20,
+		paddingBottom: 32,
+	},
+	modalHeader: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		paddingHorizontal: 16,
+		paddingTop: 14,
+		paddingBottom: 8,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: "rgba(0,0,0,0.1)",
+	},
+	modalTitle: {
+		fontSize: 16,
+		fontWeight: "800",
+		color: "#111",
+	},
+	modalCancel: {
+		fontSize: 15,
+		fontWeight: "600",
+		color: "#666",
+		width: 60,
+	},
+	iosPicker: {
+		alignSelf: "stretch",
 	},
 });
