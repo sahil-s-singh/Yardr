@@ -24,6 +24,20 @@ import {
 	View,
 } from "react-native";
 
+type IdentityProvider = "email" | "google" | "apple" | string;
+
+const PROVIDER_LABELS: Record<string, string> = {
+	google: "Google",
+	apple: "Apple",
+	email: "Email",
+};
+
+const PROVIDER_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
+	google: "g-translate",
+	apple: "apple",
+	email: "alternate-email",
+};
+
 export default function SettingsScreen() {
 	const colorScheme = useColorScheme();
 	const theme = Colors[colorScheme ?? "light"];
@@ -38,6 +52,7 @@ export default function SettingsScreen() {
 	const [savingEmail, setSavingEmail] = useState(false);
 	const [savingPassword, setSavingPassword] = useState(false);
 	const [uploadingAvatar, setUploadingAvatar] = useState(false);
+	const [deleting, setDeleting] = useState(false);
 
 	if (!user) {
 		return (
@@ -48,6 +63,30 @@ export default function SettingsScreen() {
 			</SafeAreaView>
 		);
 	}
+
+	// Supabase populates user.identities only when fetched via getUser() (not
+	// always present on cached sessions). app_metadata.providers is reliable
+	// and gets set on every sign-in.
+	const meta = (user.app_metadata ?? {}) as {
+		provider?: string;
+		providers?: string[];
+	};
+	const identityProviders = (
+		(user.identities ?? []) as Array<{ provider: string }>
+	).map((i) => i.provider);
+	const providers = Array.from(
+		new Set(
+			[
+				...(meta.providers ?? []),
+				...(meta.provider ? [meta.provider] : []),
+				...identityProviders,
+			].filter(Boolean) as string[],
+		),
+	);
+	const hasEmailIdentity = providers.includes("email");
+	const ssoProviders = providers.filter((p) => p !== "email");
+	const isSsoOnly = !hasEmailIdentity && ssoProviders.length > 0;
+	console.log("[Settings] providers:", { providers, hasEmailIdentity, isSsoOnly });
 
 	const handlePickAvatar = async () => {
 		const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -140,6 +179,48 @@ export default function SettingsScreen() {
 		}
 	};
 
+	const handleDeleteAccount = () => {
+		Alert.alert(
+			"Delete account?",
+			"This permanently removes your account, sales, saved items, reminders, and unlinks any connected Google or Apple sign-in. This cannot be undone.",
+			[
+				{ text: "Cancel", style: "cancel" },
+				{
+					text: "Delete",
+					style: "destructive",
+					onPress: () => {
+						Alert.alert(
+							"Are you sure?",
+							"Last chance — your account will be deleted right now.",
+							[
+								{ text: "Cancel", style: "cancel" },
+								{
+									text: "Yes, delete",
+									style: "destructive",
+									onPress: async () => {
+										setDeleting(true);
+										try {
+											await authService.deleteAccount();
+											router.replace("/");
+										} catch (err: any) {
+											console.error("Delete account failed:", err);
+											Alert.alert(
+												"Could not delete account",
+												err?.message ?? "Try again",
+											);
+										} finally {
+											setDeleting(false);
+										}
+									},
+								},
+							],
+						);
+					},
+				},
+			],
+		);
+	};
+
 	const avatarUrl = userProfile?.avatar_url;
 	const initial =
 		(userProfile?.display_name?.[0] ?? user.email?.[0] ?? "?").toUpperCase();
@@ -226,6 +307,35 @@ export default function SettingsScreen() {
 						/>
 					</Section>
 
+					{/* Connected accounts (only when SSO is in use) */}
+					{ssoProviders.length > 0 ? (
+						<Section title="Signed in with" theme={theme}>
+							{ssoProviders.map((p) => (
+								<View
+									key={p}
+									style={[
+										styles.providerRow,
+										{ backgroundColor: theme.card, borderColor: theme.border },
+									]}
+								>
+									<MaterialIcons
+										name={PROVIDER_ICONS[p] ?? "verified-user"}
+										size={20}
+										color={theme.tint}
+									/>
+									<Text style={[styles.providerLabel, { color: theme.text }]}>
+										{PROVIDER_LABELS[p] ?? p}
+									</Text>
+									<MaterialIcons
+										name="check-circle"
+										size={18}
+										color={theme.tint}
+									/>
+								</View>
+							))}
+						</Section>
+					) : null}
+
 					{/* Email */}
 					<Section title="Email" theme={theme}>
 						<TextInput
@@ -233,8 +343,9 @@ export default function SettingsScreen() {
 								styles.input,
 								{
 									backgroundColor: theme.card,
-									color: theme.text,
+									color: isSsoOnly ? theme.secondaryText : theme.text,
 									borderColor: theme.border,
+									opacity: isSsoOnly ? 0.7 : 1,
 								},
 							]}
 							value={email}
@@ -243,59 +354,98 @@ export default function SettingsScreen() {
 							placeholderTextColor={theme.secondaryText}
 							autoCapitalize="none"
 							keyboardType="email-address"
+							editable={!isSsoOnly}
 						/>
 						<Text style={[styles.helperText, { color: theme.secondaryText }]}>
-							Changing email sends a confirmation to both addresses.
+							{isSsoOnly
+								? `Email is managed by ${ssoProviders.map((p) => PROVIDER_LABELS[p] ?? p).join(" / ")}. Change it from your provider account.`
+								: "Changing email sends a confirmation to both addresses."}
 						</Text>
-						<PrimaryButton
-							label="Update email"
-							loading={savingEmail}
-							onPress={handleSaveEmail}
-							theme={theme}
-						/>
+						{!isSsoOnly ? (
+							<PrimaryButton
+								label="Update email"
+								loading={savingEmail}
+								onPress={handleSaveEmail}
+								theme={theme}
+							/>
+						) : null}
 					</Section>
 
-					{/* Password */}
-					<Section title="Change password" theme={theme}>
-						<TextInput
+					{/* Password — only if user has email/password identity */}
+					{hasEmailIdentity ? (
+						<Section title="Change password" theme={theme}>
+							<TextInput
+								style={[
+									styles.input,
+									{
+										backgroundColor: theme.card,
+										color: theme.text,
+										borderColor: theme.border,
+									},
+								]}
+								value={newPassword}
+								onChangeText={setNewPassword}
+								placeholder="New password"
+								placeholderTextColor={theme.secondaryText}
+								secureTextEntry
+								autoCapitalize="none"
+							/>
+							<TextInput
+								style={[
+									styles.input,
+									{
+										backgroundColor: theme.card,
+										color: theme.text,
+										borderColor: theme.border,
+										marginTop: 10,
+									},
+								]}
+								value={confirmPassword}
+								onChangeText={setConfirmPassword}
+								placeholder="Confirm new password"
+								placeholderTextColor={theme.secondaryText}
+								secureTextEntry
+								autoCapitalize="none"
+							/>
+							<PrimaryButton
+								label="Update password"
+								loading={savingPassword}
+								onPress={handleChangePassword}
+								theme={theme}
+							/>
+						</Section>
+					) : null}
+
+					{/* Danger zone */}
+					<Section title="Danger zone" theme={theme}>
+						<TouchableOpacity
+							style={[styles.dangerButton, { borderColor: "#D14B3C" }]}
+							onPress={handleDeleteAccount}
+							disabled={deleting}
+							activeOpacity={0.8}
+						>
+							{deleting ? (
+								<ActivityIndicator color="#D14B3C" />
+							) : (
+								<>
+									<MaterialIcons
+										name="delete-forever"
+										size={20}
+										color="#D14B3C"
+									/>
+									<Text style={styles.dangerText}>Delete account</Text>
+								</>
+							)}
+						</TouchableOpacity>
+						<Text
 							style={[
-								styles.input,
-								{
-									backgroundColor: theme.card,
-									color: theme.text,
-									borderColor: theme.border,
-								},
+								styles.helperText,
+								{ color: theme.secondaryText, marginTop: 10 },
 							]}
-							value={newPassword}
-							onChangeText={setNewPassword}
-							placeholder="New password"
-							placeholderTextColor={theme.secondaryText}
-							secureTextEntry
-							autoCapitalize="none"
-						/>
-						<TextInput
-							style={[
-								styles.input,
-								{
-									backgroundColor: theme.card,
-									color: theme.text,
-									borderColor: theme.border,
-									marginTop: 10,
-								},
-							]}
-							value={confirmPassword}
-							onChangeText={setConfirmPassword}
-							placeholder="Confirm new password"
-							placeholderTextColor={theme.secondaryText}
-							secureTextEntry
-							autoCapitalize="none"
-						/>
-						<PrimaryButton
-							label="Update password"
-							loading={savingPassword}
-							onPress={handleChangePassword}
-							theme={theme}
-						/>
+						>
+							Permanently removes your account, your sales, and unlinks any
+							Google/Apple sign-in. This cannot be undone.
+						</Text>
 					</Section>
 				</ScrollView>
 			</KeyboardAvoidingView>
@@ -421,6 +571,36 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 		marginBottom: 4,
 		paddingHorizontal: 4,
+	},
+	providerRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 12,
+		paddingVertical: 14,
+		paddingHorizontal: 16,
+		borderRadius: 12,
+		borderWidth: 1,
+		marginBottom: 8,
+	},
+	providerLabel: {
+		flex: 1,
+		fontSize: 15,
+		fontWeight: "700",
+	},
+	dangerButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: 8,
+		paddingVertical: 14,
+		borderRadius: 12,
+		borderWidth: 1.5,
+		backgroundColor: "transparent",
+	},
+	dangerText: {
+		color: "#D14B3C",
+		fontSize: 15,
+		fontWeight: "800",
 	},
 	button: {
 		marginTop: 12,

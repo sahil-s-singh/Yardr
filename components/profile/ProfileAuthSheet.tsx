@@ -2,10 +2,13 @@ import LogoIcon from "@/assets/splash/logo-center.svg";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { sso } from "@/lib/ssoAvailability";
+import { authService } from "@/services/authService";
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+	ActivityIndicator,
 	KeyboardAvoidingView,
 	Modal,
 	Platform,
@@ -34,6 +37,18 @@ export default function ProfileAuthSheet({
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [loading, setLoading] = useState(false);
+	const [ssoLoading, setSsoLoading] = useState<"apple" | "google" | null>(null);
+	const [appleAvailable, setAppleAvailable] = useState(false);
+
+	useEffect(() => {
+		if (!sso.appleNativeAvailable) return;
+		try {
+			const AppleAuthentication = require("expo-apple-authentication");
+			AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
+		} catch {
+			setAppleAvailable(false);
+		}
+	}, []);
 
 	const handleLogin = async () => {
 		if (!email || !password) return;
@@ -46,6 +61,34 @@ export default function ProfileAuthSheet({
 			alert(e.message || "Login failed");
 		} finally {
 			setLoading(false);
+		}
+	};
+
+	const handleApple = async () => {
+		try {
+			setSsoLoading("apple");
+			await authService.signInWithApple();
+			onClose();
+		} catch (e: any) {
+			if (e?.code !== "ERR_REQUEST_CANCELED") {
+				alert(e.message || "Apple sign-in failed");
+			}
+		} finally {
+			setSsoLoading(null);
+		}
+	};
+
+	const handleGoogle = async () => {
+		try {
+			setSsoLoading("google");
+			await authService.signInWithGoogle();
+			onClose();
+		} catch (e: any) {
+			if (!String(e?.message || "").includes("cancelled")) {
+				alert(e.message || "Google sign-in failed");
+			}
+		} finally {
+			setSsoLoading(null);
 		}
 	};
 
@@ -138,6 +181,62 @@ export default function ProfileAuthSheet({
 							</LinearGradient>
 						</TouchableOpacity>
 
+						{/* Divider + SSO buttons (only when native modules are present) */}
+						{(sso.googleNativeAvailable || appleAvailable) ? (
+							<>
+								<View style={styles.dividerRow}>
+									<View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+									<Text style={[styles.dividerText, { color: theme.secondaryText }]}>
+										or continue with
+									</Text>
+									<View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+								</View>
+
+								{Platform.OS === "ios" && appleAvailable ? (
+									<TouchableOpacity
+										style={styles.appleBtn}
+										onPress={handleApple}
+										disabled={ssoLoading !== null}
+										activeOpacity={0.85}
+									>
+										{ssoLoading === "apple" ? (
+											<ActivityIndicator color="#fff" />
+										) : (
+											<>
+												<MaterialIcons name="apple" size={20} color="#fff" />
+												<Text style={styles.appleText}>Continue with Apple</Text>
+											</>
+										)}
+									</TouchableOpacity>
+								) : null}
+
+								{sso.googleNativeAvailable ? (
+									<TouchableOpacity
+										style={[
+											styles.googleBtn,
+											{ borderColor: theme.border, backgroundColor: theme.background },
+										]}
+										onPress={handleGoogle}
+										disabled={ssoLoading !== null}
+										activeOpacity={0.85}
+									>
+										{ssoLoading === "google" ? (
+											<ActivityIndicator color={theme.text} />
+										) : (
+											<>
+												<View style={styles.googleIcon}>
+													<Text style={styles.googleG}>G</Text>
+												</View>
+												<Text style={[styles.googleText, { color: theme.text }]}>
+													Continue with Google
+												</Text>
+											</>
+										)}
+									</TouchableOpacity>
+								) : null}
+							</>
+						) : null}
+
 						{/* Footer */}
 						<View style={styles.footer}>
 							<Text style={[styles.footerText, { color: theme.secondaryText }]}>
@@ -219,6 +318,62 @@ const styles = StyleSheet.create({
 	signInText: {
 		color: "#FFF",
 		fontSize: 18,
+		fontWeight: "700",
+	},
+	dividerRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginTop: 24,
+		marginBottom: 16,
+	},
+	dividerLine: {
+		flex: 1,
+		height: StyleSheet.hairlineWidth,
+	},
+	dividerText: {
+		marginHorizontal: 12,
+		fontSize: 12,
+		fontWeight: "600",
+	},
+	appleBtn: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: 8,
+		height: 50,
+		borderRadius: 14,
+		backgroundColor: "#000",
+		marginBottom: 12,
+	},
+	appleText: {
+		color: "#fff",
+		fontSize: 15,
+		fontWeight: "700",
+	},
+	googleBtn: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: 10,
+		height: 50,
+		borderRadius: 14,
+		borderWidth: 1,
+	},
+	googleIcon: {
+		width: 22,
+		height: 22,
+		borderRadius: 11,
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "#4285F4",
+	},
+	googleG: {
+		color: "#fff",
+		fontSize: 14,
+		fontWeight: "900",
+	},
+	googleText: {
+		fontSize: 15,
 		fontWeight: "700",
 	},
 	footer: {
