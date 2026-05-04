@@ -1,9 +1,11 @@
 // app/sell/index.tsx — Step 1: Record Video
 import GradientBackground from "@/components/ui/GradientBackground";
 import ProgressBar from "@/components/ui/ProgressBar";
-import { saveSellDraft } from "@/lib/draftSale";
+import { loadSellDraft, saveSellDraft } from "@/lib/draftSale";
+import { salePhotosService } from "@/services/salePhotosService";
 import { MaterialIcons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -27,6 +29,50 @@ export default function RecordVideoScreen() {
 			requestPermission();
 		}
 	}, [permission]);
+
+	const handlePickFromLibrary = async () => {
+		const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+		if (!perm.granted) {
+			Alert.alert(
+				"Permission required",
+				"Allow photo library access to attach photos and videos.",
+			);
+			return;
+		}
+		const result = await ImagePicker.launchImageLibraryAsync({
+			mediaTypes: ImagePicker.MediaTypeOptions.All,
+			allowsMultipleSelection: true,
+			selectionLimit: salePhotosService.MAX_PHOTOS,
+			quality: 0.8,
+			videoMaxDuration: 60,
+		});
+		if (result.canceled || !result.assets?.length) return;
+
+		const existing = (await loadSellDraft()) || {};
+		const existingPhotos = existing.photos || [];
+		const newPhotos: string[] = [];
+		let pickedVideo: string | undefined;
+		for (const asset of result.assets) {
+			if (asset.type === "video") {
+				if (!pickedVideo) pickedVideo = asset.uri;
+			} else {
+				newPhotos.push(asset.uri);
+			}
+		}
+		const photos = [...existingPhotos, ...newPhotos].slice(
+			0,
+			salePhotosService.MAX_PHOTOS,
+		);
+		await saveSellDraft({
+			...existing,
+			photos,
+			videoUri: pickedVideo ?? existing.videoUri,
+		});
+		router.replace({
+			pathname: "/sell/video",
+			params: { videoUri: pickedVideo ?? existing.videoUri ?? undefined },
+		});
+	};
 
 	const toggleRecording = async () => {
 		if (!cameraRef.current || !cameraReady) return;
@@ -89,7 +135,17 @@ export default function RecordVideoScreen() {
 
 			{/* Header */}
 			<View style={styles.header}>
-				<TouchableOpacity onPress={() => router.back()}>
+				<TouchableOpacity
+					onPress={() => {
+						// Exit the sell flow back to the home feed regardless of
+						// what screen launched it. dismissAll clears any modal/stack
+						// the sell flow was pushed onto.
+						try {
+							(router as any).dismissAll?.();
+						} catch {}
+						router.replace("/");
+					}}
+				>
 					<Text style={styles.backChevron}>{"\u2039"}</Text>
 				</TouchableOpacity>
 				<Text style={styles.headerTitle}>Record Video</Text>
@@ -124,8 +180,12 @@ export default function RecordVideoScreen() {
 
 			{/* Controls */}
 			<View style={styles.controls}>
-				{/* Gallery */}
-				<TouchableOpacity style={styles.sideBtn}>
+				{/* Gallery — pick photos and/or video from library */}
+				<TouchableOpacity
+					style={styles.sideBtn}
+					onPress={handlePickFromLibrary}
+					activeOpacity={0.85}
+				>
 					<MaterialIcons name="photo-library" size={24} color="#807A73" />
 				</TouchableOpacity>
 

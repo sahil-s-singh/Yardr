@@ -8,6 +8,7 @@ import {
 	SellDraft,
 } from "@/lib/draftSale";
 import { garageSaleService } from "@/services/garageSaleService";
+import { salePhotosService } from "@/services/salePhotosService";
 import { videoService } from "@/services/videoService";
 import { checkNewSaleAgainstWishlists } from "@/services/wishlistService";
 import { LinearGradient } from "expo-linear-gradient";
@@ -130,6 +131,31 @@ export default function PublishSaleScreen() {
 				}
 			}
 
+			// Upload any local photo URIs to Supabase Storage. Already-uploaded
+			// http URLs pass through unchanged.
+			let imageUrls: string[] | undefined;
+			if (draft.photos?.length) {
+				if (!user?.id) {
+					Alert.alert("Sign in required", "Please sign in to attach photos.");
+					setPublishing(false);
+					return;
+				}
+				try {
+					imageUrls = await salePhotosService.uploadPhotos(
+						user.id,
+						draft.photos,
+					);
+				} catch (uploadErr: any) {
+					console.error("Photo upload failed:", uploadErr);
+					Alert.alert(
+						"Photo upload failed",
+						uploadErr?.message ?? "Could not upload photos. Please try again.",
+					);
+					setPublishing(false);
+					return;
+				}
+			}
+
 			const newSale = await garageSaleService.addGarageSale(
 				{
 					title: draft.title!,
@@ -149,7 +175,7 @@ export default function PublishSaleScreen() {
 					contactPhone: draft.contactPhone?.trim() || undefined,
 					contactEmail: user?.email || undefined,
 					videoUrl,
-					images: draft.photos || undefined,
+					images: imageUrls,
 					isActive: true,
 				},
 				deviceId,

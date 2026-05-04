@@ -4,10 +4,12 @@ import GradientBackground from "@/components/ui/GradientBackground";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { analyzeGarageSaleVideo } from "@/lib/claude";
 import { loadSellDraft, saveSellDraft } from "@/lib/draftSale";
+import { salePhotosService } from "@/services/salePhotosService";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { MaterialIcons } from "@expo/vector-icons";
 import { EncodingType, readAsStringAsync } from "expo-file-system/legacy";
 import { useVideoPlayer, VideoView } from "expo-video";
+import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -16,6 +18,7 @@ import * as VideoThumbnails from "expo-video-thumbnails";
 import {
 	ActivityIndicator,
 	Alert,
+	Image,
 	SafeAreaView,
 	ScrollView,
 	StyleSheet,
@@ -90,6 +93,7 @@ export default function ReviewScreen() {
 	const [categories, setCategories] = useState<string[]>([]);
 	const [addressLine, setAddressLine] = useState("");
 	const [contactPhone, setContactPhone] = useState("");
+	const [photos, setPhotos] = useState<string[]>([]);
 	const [coords, setCoords] = useState<{
 		latitude: number;
 		longitude: number;
@@ -151,6 +155,7 @@ export default function ReviewScreen() {
 					if (draft.startTime) setStartTime(draft.startTime);
 					if (draft.endTime) setEndTime(draft.endTime);
 					if (draft.contactPhone) setContactPhone(draft.contactPhone);
+					if (Array.isArray(draft.photos)) setPhotos(draft.photos);
 				}
 
 				if (videoUri) {
@@ -181,8 +186,43 @@ export default function ReviewScreen() {
 			startTime,
 			endTime,
 			contactPhone: contactPhone.trim() || undefined,
+			photos,
 		}).catch(() => {});
-	}, [loading, videoUri, title, description, categories, addressLine, coords, startDate, endDate, startTime, endTime, contactPhone]);
+	}, [loading, videoUri, title, description, categories, addressLine, coords, startDate, endDate, startTime, endTime, contactPhone, photos]);
+
+	const handleAddPhotos = async () => {
+		if (photos.length >= salePhotosService.MAX_PHOTOS) {
+			Alert.alert(
+				"Photo limit reached",
+				`You can attach up to ${salePhotosService.MAX_PHOTOS} photos.`,
+			);
+			return;
+		}
+		const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+		if (!perm.granted) {
+			Alert.alert(
+				"Permission required",
+				"Allow photo library access to attach photos.",
+			);
+			return;
+		}
+		const result = await ImagePicker.launchImageLibraryAsync({
+			mediaTypes: ImagePicker.MediaTypeOptions.Images,
+			allowsMultipleSelection: true,
+			selectionLimit: salePhotosService.MAX_PHOTOS - photos.length,
+			quality: 0.8,
+		});
+		if (result.canceled || !result.assets?.length) return;
+		const next = [...photos, ...result.assets.map((a) => a.uri)].slice(
+			0,
+			salePhotosService.MAX_PHOTOS,
+		);
+		setPhotos(next);
+	};
+
+	const handleRemovePhoto = (uri: string) => {
+		setPhotos((prev) => prev.filter((p) => p !== uri));
+	};
 
 	// Auto-detect location
 	useEffect(() => {
@@ -305,6 +345,44 @@ export default function ReviewScreen() {
 						</Text>
 					</View>
 				)}
+
+				{/* Photos */}
+				<View style={styles.fieldGroup}>
+					<View style={styles.photosHeader}>
+						<Text style={styles.label}>Photos</Text>
+						<Text style={styles.photosCount}>
+							{photos.length}/{salePhotosService.MAX_PHOTOS}
+						</Text>
+					</View>
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						contentContainerStyle={styles.photosStrip}
+					>
+						{photos.map((uri) => (
+							<View key={uri} style={styles.photoTile}>
+								<Image source={{ uri }} style={styles.photoThumb} />
+								<TouchableOpacity
+									style={styles.photoRemove}
+									onPress={() => handleRemovePhoto(uri)}
+									hitSlop={6}
+								>
+									<MaterialIcons name="close" size={14} color="#fff" />
+								</TouchableOpacity>
+							</View>
+						))}
+						{photos.length < salePhotosService.MAX_PHOTOS ? (
+							<TouchableOpacity
+								style={styles.photoAddTile}
+								onPress={handleAddPhotos}
+								activeOpacity={0.85}
+							>
+								<MaterialIcons name="add" size={28} color="#807A73" />
+								<Text style={styles.photoAddLabel}>Add</Text>
+							</TouchableOpacity>
+						) : null}
+					</ScrollView>
+				</View>
 
 				{/* Glass Inputs */}
 				<View style={styles.fieldGroup}>
@@ -529,6 +607,61 @@ const styles = StyleSheet.create({
 		fontWeight: "600",
 		color: "#23201C",
 		marginBottom: 8,
+	},
+	photosHeader: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		marginBottom: 8,
+	},
+	photosCount: {
+		fontSize: 12,
+		color: "#807A73",
+		fontWeight: "600",
+	},
+	photosStrip: {
+		gap: 10,
+		paddingVertical: 4,
+	},
+	photoTile: {
+		width: 80,
+		height: 80,
+		borderRadius: 12,
+		overflow: "hidden",
+		position: "relative",
+		backgroundColor: "rgba(0,0,0,0.05)",
+	},
+	photoThumb: {
+		width: "100%",
+		height: "100%",
+	},
+	photoRemove: {
+		position: "absolute",
+		top: 4,
+		right: 4,
+		width: 20,
+		height: 20,
+		borderRadius: 10,
+		backgroundColor: "rgba(0,0,0,0.6)",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	photoAddTile: {
+		width: 80,
+		height: 80,
+		borderRadius: 12,
+		borderWidth: 1.5,
+		borderStyle: "dashed",
+		borderColor: "rgba(128,122,115,0.4)",
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "rgba(255,255,255,0.5)",
+	},
+	photoAddLabel: {
+		fontSize: 11,
+		color: "#807A73",
+		fontWeight: "600",
+		marginTop: 2,
 	},
 	glassInput: {
 		backgroundColor: "rgba(255,255,255,0.5)",
