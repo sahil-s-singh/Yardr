@@ -138,11 +138,11 @@ export const authService = {
   /**
    * Listen for auth state changes
    */
-  onAuthStateChange: (callback: (session: Session | null) => void) => {
+  onAuthStateChange: (callback: (session: Session | null, event: string) => void) => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      callback(session);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      callback(session, event);
     });
 
     return subscription;

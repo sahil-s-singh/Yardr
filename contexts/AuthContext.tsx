@@ -49,17 +49,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     // Listen for auth changes
-    const subscription = authService.onAuthStateChange((session) => {
-      console.log('[AuthContext] onAuthStateChange:', {
-        hasSession: !!session,
-        userId: session?.user?.id,
-      });
+    const subscription = authService.onAuthStateChange((session, event) => {
       setSession(session);
       setUser(session?.user || null);
 
       if (session?.user) {
         loadUserProfile(session.user.id);
         registerPushToken(session.user.id);
+
+        // Claim anonymous sales on fresh sign-in only (not on session restores)
+        if (event === 'SIGNED_IN') {
+          rateLimitService.getDeviceId().then((deviceId) =>
+            garageSaleService.claimDeviceSales(deviceId).catch(() => {})
+          ).catch(() => {});
+        }
       } else {
         setUserProfile(null);
       }

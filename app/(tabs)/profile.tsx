@@ -142,7 +142,7 @@ export default function ProfileScreen() {
 		color: string;
 		route?: string;
 	}[] = [
-		{ label: "Sales", value: String(salesCount), icon: "style", color: theme.tint },
+		{ label: "Sales", value: String(salesCount), icon: "style", color: theme.tint, route: "/my-sales" },
 		{ label: "Saved", value: String(savedCount), icon: "favorite", color: Accent.sage, route: "/favorites" },
 		{ label: "Reminders", value: String(remindersCount), icon: "notifications", color: Accent.indigo, route: "/reminders" },
 	];

@@ -81,6 +81,7 @@ export default function SaleCard({
 						style={styles.media}
 						contentFit="cover"
 						nativeControls={false}
+						pointerEvents="none"
 					/>
 				) : img ? (
 					<Image

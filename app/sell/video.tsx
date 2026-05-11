@@ -19,6 +19,8 @@ import {
 	ActivityIndicator,
 	Alert,
 	Image,
+	KeyboardAvoidingView,
+	Platform,
 	SafeAreaView,
 	ScrollView,
 	StyleSheet,
@@ -244,41 +246,54 @@ export default function ReviewScreen() {
 		}
 	}, []);
 
-	// Analyze video with Claude AI
-	const analyzeVideo = async (uri: string) => {
+	const runAnalysis = async (base64Frames: string[]) => {
 		setAnalyzing(true);
 		try {
-			// Extract 3 frames from the video
-			const thumbnails = await Promise.all(
-				[0, 2500, 4500].map((time) =>
-					VideoThumbnails.getThumbnailAsync(uri, { time })
-				)
-			);
-
-			// Convert to base64
-			const base64Frames = await Promise.all(
-				thumbnails.map((t) =>
-					readAsStringAsync(t.uri, { encoding: EncodingType.Base64 })
-				)
-			);
-
-			// Call Claude
 			const analysis = await analyzeGarageSaleVideo(base64Frames);
-
 			setTitle((t) => t || analysis.title);
 			setDescription((d) => d || analysis.description);
 			setCategories((c) => (c?.length ? c : analysis.categories));
 		} catch (error) {
-			console.error("Video analysis failed:", error);
-			// Silently fail — user can fill in manually
+			console.error("AI analysis failed:", error);
 		} finally {
 			setAnalyzing(false);
 		}
 	};
 
+	// Analyze video frames (preferred) or fall back to uploaded photos
 	useEffect(() => {
-		if (videoUri) analyzeVideo(videoUri);
-	}, [videoUri]);
+		if (loading) return;
+		(async () => {
+			if (videoUri) {
+				try {
+					const thumbnails = await Promise.all(
+						[0, 2500, 4500].map((time) =>
+							VideoThumbnails.getThumbnailAsync(videoUri, { time })
+						)
+					);
+					const base64Frames = await Promise.all(
+						thumbnails.map((t) =>
+							readAsStringAsync(t.uri, { encoding: EncodingType.Base64 })
+						)
+					);
+					await runAnalysis(base64Frames);
+				} catch (error) {
+					console.error("Video frame extraction failed:", error);
+				}
+			} else if (photos.length > 0) {
+				try {
+					const base64Frames = await Promise.all(
+						photos.slice(0, 3).map((uri) =>
+							readAsStringAsync(uri, { encoding: EncodingType.Base64 })
+						)
+					);
+					await runAnalysis(base64Frames);
+				} catch (error) {
+					console.error("Photo analysis failed:", error);
+				}
+			}
+		})();
+	}, [videoUri, loading]);
 
 	const player = useVideoPlayer(videoUri ?? null, (p) => {
 		p.loop = true;
@@ -321,9 +336,15 @@ export default function ReviewScreen() {
 
 			<ProgressBar step={2} />
 
+			<KeyboardAvoidingView
+				style={{ flex: 1 }}
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
+				keyboardVerticalOffset={0}
+			>
 			<ScrollView
 				contentContainerStyle={styles.content}
 				showsVerticalScrollIndicator={false}
+				keyboardShouldPersistTaps="handled"
 			>
 				{/* Video Preview */}
 				{videoUri && (
@@ -548,6 +569,7 @@ export default function ReviewScreen() {
 
 				<View style={{ height: 40 }} />
 			</ScrollView>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 }

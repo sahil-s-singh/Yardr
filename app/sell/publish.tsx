@@ -8,6 +8,7 @@ import {
 	SellDraft,
 } from "@/lib/draftSale";
 import { garageSaleService } from "@/services/garageSaleService";
+import { rateLimitService } from "@/services/rateLimitService";
 import { salePhotosService } from "@/services/salePhotosService";
 import { videoService } from "@/services/videoService";
 import { checkNewSaleAgainstWishlists } from "@/services/wishlistService";
@@ -116,9 +117,7 @@ export default function PublishSaleScreen() {
 		setPublishing(true);
 
 		try {
-			const deviceId = `device-${Date.now()}-${Math.random()
-				.toString(36)
-				.substr(2, 9)}`;
+			const deviceId = await rateLimitService.getDeviceId();
 
 			// Upload video to Supabase Storage if we have one
 			let videoUrl: string | undefined;

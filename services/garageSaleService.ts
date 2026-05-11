@@ -412,10 +412,13 @@ export async function getMySales(userId: string) {
 }
 
 export const deleteSale = async (saleId: string) => {
-	const { error } = await supabase
-		.from("garage_sales")
-		.update({ is_active: false })
-		.eq("id", saleId);
+	const { data: { session } } = await supabase.auth.getSession();
+	if (!session) throw new Error("Not authenticated");
+
+	const { error } = await supabase.rpc("soft_delete_sale", {
+		p_sale_id: saleId,
+		p_user_id: session.user.id,
+	});
 
 	if (error) {
 		console.error("Soft delete failed:", error);

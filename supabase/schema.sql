@@ -34,13 +34,12 @@ CREATE POLICY "Anyone can create garage sales"
   FOR INSERT
   WITH CHECK (true);
 
--- Policy: Users can update their own garage sales (requires auth)
--- Uncomment when you add authentication
--- CREATE POLICY "Users can update their own garage sales"
---   ON garage_sales
---   FOR UPDATE
---   USING (auth.uid() = user_id)
---   WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own garage sales"
+  ON garage_sales
+  FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 -- Create index for location queries
 CREATE INDEX garage_sales_location_idx ON garage_sales (latitude, longitude);
