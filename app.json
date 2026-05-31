@@ -16,7 +16,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "10"
+      "buildNumber": "11"
     },
     "android": {
       "adaptiveIcon": {
@@ -29,7 +29,7 @@
       "predictiveBackGestureEnabled": false,
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyDsktqpJ0iWDwPc56QSIMTVapNKqt9v1ag"
+          "apiKey": ""
         }
       },
       "permissions": [
@@ -70,13 +70,14 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Yardr to use your camera to record sale videos."
+          "cameraPermission": "Allow Yardr to use your camera to record garage sale videos.",
+          "microphonePermission": "Allow Yardr to use your microphone to record sale videos with audio."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow Yardr to use your location to find nearby garage sales."
+          "locationWhenInUsePermission": "Allow Yardr to use your location to show nearby garage sales on the map."
         }
       ],
       "expo-apple-authentication",

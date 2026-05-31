@@ -10,6 +10,7 @@ import { useState } from "react";
 import { Alert, StyleSheet, TouchableOpacity, View } from "react-native";
 
 export default function TestVideoScreen() {
+	if (!__DEV__) return null;
 	const [showCamera, setShowCamera] = useState(false);
 	const [analyzing, setAnalyzing] = useState(false);
 	const [result, setResult] = useState<any>(null);

@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
 export default function TestNotificationScreen() {
+  if (!__DEV__) return null;
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
 
