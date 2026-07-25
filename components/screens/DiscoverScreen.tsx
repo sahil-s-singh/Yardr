@@ -1,15 +1,20 @@
 // components/screens/DiscoverScreen.tsx
 import { useFocusEffect } from "@react-navigation/native";
+import * as Linking from "expo-linking";
 import * as Location from "expo-location";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
+	ActionSheetIOS,
 	ActivityIndicator,
 	FlatList,
+	Image,
+	Platform,
 	RefreshControl,
 	SafeAreaView,
 	StyleSheet,
 	Text,
+	TouchableOpacity,
 	View,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
@@ -77,6 +82,7 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 
 	const [selectedStory, setSelectedStory] = useState<GarageSale | null>(null);
 	const [storyViewerVisible, setStoryViewerVisible] = useState(false);
+	const [selectedMarker, setSelectedMarker] = useState<SaleWithDistance | null>(null);
 
 	const loadSales = useCallback(async () => {
 		try {
@@ -105,14 +111,26 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 				loc.longitude
 			);
 			setSales(list);
-		} catch (e) {
-			console.error("Discover loadSales error:", e);
+		} catch (e: any) {
+			console.error(
+				"Discover loadSales error:",
+				e?.message || e,
+				e?.code,
+				e?.details,
+				e?.hint
+			);
 			setAddressLine((prev) => prev || "Location unavailable");
 			try {
 				const list = await garageSaleService.getAllGarageSales();
 				setSales(list);
-			} catch (err) {
-				console.error("Failed to load sales fallback:", err);
+			} catch (err: any) {
+				console.error(
+					"Failed to load sales fallback:",
+					err?.message || err,
+					err?.code,
+					err?.details,
+					err?.hint
+				);
 			}
 		} finally {
 			setLoading(false);
@@ -168,6 +186,27 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 		setSelectedStory(null);
 	}, []);
 
+	const handleGetDirections = useCallback((sale: SaleWithDistance) => {
+		const { latitude, longitude, address } = sale.location;
+		const appleMapsUrl = `http://maps.apple.com/?daddr=${latitude},${longitude}`;
+		const googleMapsUrl = `https://maps.google.com/maps?daddr=${latitude},${longitude}`;
+
+		if (Platform.OS === "ios") {
+			ActionSheetIOS.showActionSheetWithOptions(
+				{
+					options: ["Apple Maps", "Google Maps", "Cancel"],
+					cancelButtonIndex: 2,
+				},
+				(index) => {
+					if (index === 0) Linking.openURL(appleMapsUrl);
+					else if (index === 1) Linking.openURL(googleMapsUrl);
+				}
+			);
+		} else {
+			Linking.openURL(googleMapsUrl);
+		}
+	}, []);
+
 	// MAP MODE: full-screen map with UI floating on top
 	if (mode === "map") {
 		return (
@@ -179,6 +218,7 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 					region={mapRegion}
 					showsUserLocation={true}
 					showsMyLocationButton={true}
+					onPress={() => setSelectedMarker(null)}
 				>
 					{salesWithDistance.map((s) => (
 						<Marker
@@ -187,18 +227,59 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 								latitude: s.location.latitude,
 								longitude: s.location.longitude,
 							}}
-							title={s.title}
-							description={s.location.address}
+							onPress={() => setSelectedMarker(s)}
 						/>
 					))}
 				</MapView>
 
-				{/* Header with white background */}
-				<View style={styles.mapHeaderStrip}>
+				{/* Header with theme background */}
+				<View style={[styles.mapHeaderStrip, { backgroundColor: theme.background }]}>
 					<SafeAreaView>
 						<HeaderBar mode={mode} onToggleMode={setMode} />
 					</SafeAreaView>
 				</View>
+
+				{/* Bottom card when marker is selected */}
+				{selectedMarker && (
+					<View style={styles.markerCard}>
+						{(selectedMarker.images?.[0] || selectedMarker.videoUrl) && (
+							<Image
+								source={{ uri: selectedMarker.images?.[0] || selectedMarker.videoUrl }}
+								style={styles.markerCardImage}
+								resizeMode="cover"
+							/>
+						)}
+						<View style={styles.markerCardBody}>
+							<Text style={styles.markerCardTitle} numberOfLines={1}>
+								{selectedMarker.title}
+							</Text>
+							<Text style={styles.markerCardAddress} numberOfLines={1}>
+								{selectedMarker.location.address}
+							</Text>
+							{selectedMarker._distanceText ? (
+								<Text style={styles.markerCardDistance}>
+									{selectedMarker._distanceText} away
+								</Text>
+							) : null}
+							<View style={styles.markerCardButtons}>
+								<TouchableOpacity
+									style={styles.markerCardButtonPrimary}
+									onPress={() => router.push(`/sale-detail/${selectedMarker.id}`)}
+									activeOpacity={0.8}
+								>
+									<Text style={styles.markerCardButtonPrimaryText}>View Detail</Text>
+								</TouchableOpacity>
+								<TouchableOpacity
+									style={styles.markerCardButtonSecondary}
+									onPress={() => handleGetDirections(selectedMarker)}
+									activeOpacity={0.8}
+								>
+									<Text style={styles.markerCardButtonSecondaryText}>Get Directions</Text>
+								</TouchableOpacity>
+							</View>
+						</View>
+					</View>
+				)}
 
 				<StoryViewer
 					visible={storyViewerVisible}
@@ -307,6 +388,72 @@ const styles = StyleSheet.create({
 		top: 0,
 		left: 0,
 		right: 0,
-		backgroundColor: "#FFFFFF",
+	},
+
+	markerCard: {
+		position: "absolute",
+		bottom: 30,
+		left: 16,
+		right: 16,
+		backgroundColor: "#fff",
+		borderRadius: 18,
+		overflow: "hidden",
+		shadowColor: "#000",
+		shadowOpacity: 0.15,
+		shadowRadius: 12,
+		shadowOffset: { width: 0, height: 4 },
+		elevation: 6,
+	},
+	markerCardImage: {
+		width: "100%",
+		height: 140,
+	},
+	markerCardBody: {
+		padding: 14,
+	},
+	markerCardTitle: {
+		fontSize: 17,
+		fontWeight: "700",
+		color: "#23201C",
+		marginBottom: 4,
+	},
+	markerCardAddress: {
+		fontSize: 13,
+		color: "#807A73",
+		marginBottom: 4,
+	},
+	markerCardDistance: {
+		fontSize: 13,
+		fontWeight: "600",
+		color: "#DF6B4F",
+		marginBottom: 12,
+	},
+	markerCardButtons: {
+		flexDirection: "row",
+		gap: 10,
+	},
+	markerCardButtonPrimary: {
+		flex: 1,
+		backgroundColor: "#DF6B4F",
+		borderRadius: 12,
+		paddingVertical: 12,
+		alignItems: "center",
+	},
+	markerCardButtonPrimaryText: {
+		color: "#fff",
+		fontSize: 14,
+		fontWeight: "700",
+	},
+	markerCardButtonSecondary: {
+		flex: 1,
+		backgroundColor: "#F1EDE8",
+		borderRadius: 12,
+		paddingVertical: 12,
+		alignItems: "center",
+	},
+	markerCardButtonSecondaryText: {
+		color: "#23201C",
+		fontSize: 14,
+		fontWeight: "700",
 	},
 });

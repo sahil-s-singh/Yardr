@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ResizeMode, Video } from "expo-av";
 
 import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
@@ -37,6 +38,7 @@ export default function SaleCard({
 	const theme = Colors[colorScheme ?? "light"];
 
 	const img = sale.images?.[0];
+	const videoUrl = sale.videoUrl;
 	const dateIso = sale.startDate || sale.date;
 
 	const badgeText = useMemo(() => formatDateBadge(dateIso), [dateIso]);
@@ -56,6 +58,19 @@ export default function SaleCard({
 						style={styles.media}
 						resizeMode="cover"
 					/>
+				) : videoUrl ? (
+					<View style={styles.media}>
+						<Video
+							source={{ uri: videoUrl }}
+							style={StyleSheet.absoluteFill}
+							resizeMode={ResizeMode.COVER}
+							shouldPlay={false}
+							isMuted
+						/>
+						<View style={styles.playOverlay}>
+							<MaterialIcons name="play-circle-filled" size={40} color="rgba(255,255,255,0.85)" />
+						</View>
+					</View>
 				) : (
 					<View
 						style={[styles.mediaPlaceholder, { backgroundColor: theme.muted }]}
@@ -139,6 +154,12 @@ const styles = StyleSheet.create({
 		height: "100%",
 		alignItems: "center",
 		justifyContent: "center",
+	},
+	playOverlay: {
+		...StyleSheet.absoluteFillObject,
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "rgba(0,0,0,0.15)",
 	},
 
 	distancePill: {

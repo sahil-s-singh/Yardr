@@ -40,6 +40,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Yardr to access your camera to record videos of your sale items.",
+          "microphonePermission": "Allow Yardr to access your microphone to record audio with your sale videos.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",

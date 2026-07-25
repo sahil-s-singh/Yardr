@@ -41,3 +41,9 @@ app-example
 # generated native folders
 /ios
 /android
+
+# local MCP server config
+.mcp.json
+
+# supabase CLI local state
+supabase/.temp/

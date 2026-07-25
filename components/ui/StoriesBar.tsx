@@ -28,6 +28,7 @@ export default function StoriesBar({ sales, onStoryPress }: StoriesBarProps) {
 					<StoryCircle
 						key={sale.id}
 						imageUrl={sale.images?.[0]}
+						videoUrl={sale.videoUrl}
 						title={sale.title}
 						hasVideo={!!sale.videoUrl}
 						onPress={() => onStoryPress(sale)}

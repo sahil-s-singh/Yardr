@@ -1,5 +1,6 @@
 import React from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ResizeMode, Video } from "expo-av";
 
 import { Accent, Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -14,6 +15,7 @@ const RING_COLORS = [
 
 interface StoryCircleProps {
 	imageUrl?: string;
+	videoUrl?: string;
 	title: string;
 	hasVideo: boolean;
 	onPress: () => void;
@@ -22,6 +24,7 @@ interface StoryCircleProps {
 
 export default function StoryCircle({
 	imageUrl,
+	videoUrl,
 	title,
 	hasVideo,
 	onPress,
@@ -50,23 +53,24 @@ export default function StoryCircle({
 				<View style={[styles.circleInner, { backgroundColor: theme.card }]}>
 					{imageUrl ? (
 						<Image source={{ uri: imageUrl }} style={styles.image} />
+					) : videoUrl ? (
+						<View style={styles.placeholder}>
+							<Video
+								source={{ uri: videoUrl }}
+								style={StyleSheet.absoluteFill}
+								resizeMode={ResizeMode.COVER}
+								shouldPlay={false}
+								isMuted
+							/>
+							<View style={styles.blurOverlay} />
+						</View>
 					) : (
 						<View
 							style={[styles.placeholder, { backgroundColor: theme.muted }]}
-						>
-							<Text style={[styles.placeholderText, { color: theme.text }]}>
-								{title.charAt(0).toUpperCase()}
-							</Text>
-						</View>
+						/>
 					)}
 				</View>
 			</View>
-			<Text
-				style={[styles.title, { color: theme.secondaryText }]}
-				numberOfLines={1}
-			>
-				{title}
-			</Text>
 		</TouchableOpacity>
 	);
 }
@@ -100,14 +104,10 @@ const styles = StyleSheet.create({
 		height: "100%",
 		justifyContent: "center",
 		alignItems: "center",
+		overflow: "hidden",
 	},
-	placeholderText: {
-		fontSize: 22,
-		fontWeight: "700",
-	},
-	title: {
-		fontSize: 11,
-		fontWeight: "600",
-		textAlign: "center",
+	blurOverlay: {
+		...StyleSheet.absoluteFillObject,
+		backgroundColor: "rgba(0,0,0,0.3)",
 	},
 });

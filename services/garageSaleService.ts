@@ -1,6 +1,29 @@
 import { supabase } from "@/lib/supabase";
 import { GarageSale } from "@/types/garageSale";
 
+const formatSupabaseError = (error: unknown): string => {
+	if (!error) return "unknown error";
+	if (typeof error === "string") return error;
+	const e = error as {
+		message?: string;
+		code?: string;
+		details?: string;
+		hint?: string;
+		status?: number;
+	};
+	return JSON.stringify(
+		{
+			message: e.message,
+			code: e.code,
+			details: e.details,
+			hint: e.hint,
+			status: e.status,
+		},
+		null,
+		2
+	);
+};
+
 // Database row type from Supabase
 interface GarageSaleRow {
 	id: string;
@@ -65,7 +88,7 @@ export const garageSaleService = {
 				.order("date", { ascending: true });
 
 			if (error) {
-				console.error("Supabase error:", error);
+				console.error("Supabase error:", formatSupabaseError(error));
 				throw error;
 			}
 
@@ -90,7 +113,7 @@ export const garageSaleService = {
 				.eq("is_active", true);
 
 			if (error) {
-				console.error("Supabase error:", error);
+				console.error("Supabase error:", formatSupabaseError(error));
 				throw error;
 			}
 
@@ -123,7 +146,7 @@ export const garageSaleService = {
 				.single();
 
 			if (error) {
-				console.error("Supabase error:", error);
+				console.error("Supabase error:", formatSupabaseError(error));
 				throw error;
 			}
 
@@ -178,7 +201,7 @@ export const garageSaleService = {
 				.single();
 
 			if (error) {
-				console.error("Supabase error:", error);
+				console.error("Supabase error:", formatSupabaseError(error));
 				throw error;
 			}
 
@@ -231,7 +254,7 @@ export const garageSaleService = {
 				.single();
 
 			if (error) {
-				console.error("Supabase error:", error);
+				console.error("Supabase error:", formatSupabaseError(error));
 				throw error;
 			}
 
@@ -251,7 +274,7 @@ export const garageSaleService = {
 				.eq("id", id);
 
 			if (error) {
-				console.error("Supabase error:", error);
+				console.error("Supabase error:", formatSupabaseError(error));
 				throw error;
 			}
 		} catch (error) {
@@ -270,7 +293,7 @@ export const garageSaleService = {
 				.order("created_at", { ascending: false });
 
 			if (error) {
-				console.error("Supabase error:", error);
+				console.error("Supabase error:", formatSupabaseError(error));
 				throw error;
 			}
 
@@ -291,7 +314,7 @@ export const garageSaleService = {
 				.order("created_at", { ascending: false });
 
 			if (error) {
-				console.error("Supabase error:", error);
+				console.error("Supabase error:", formatSupabaseError(error));
 				throw error;
 			}
 
@@ -324,7 +347,7 @@ export const garageSaleService = {
 			const { data, error } = await query;
 
 			if (error) {
-				console.error("Supabase error:", error);
+				console.error("Supabase error:", formatSupabaseError(error));
 				throw error;
 			}
 
@@ -343,7 +366,10 @@ export const garageSaleService = {
 			});
 
 			if (error) {
-				console.error("Supabase error claiming device sales:", error);
+				console.error(
+				"Supabase error claiming device sales:",
+				formatSupabaseError(error)
+			);
 				throw error;
 			}
 

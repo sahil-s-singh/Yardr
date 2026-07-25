@@ -3,7 +3,11 @@ import GradientBackground from "@/components/ui/GradientBackground";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { saveSellDraft } from "@/lib/draftSale";
 import { MaterialIcons } from "@expo/vector-icons";
-import { CameraView, useCameraPermissions } from "expo-camera";
+import {
+	CameraView,
+	useCameraPermissions,
+	useMicrophonePermissions,
+} from "expo-camera";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -18,6 +22,7 @@ import {
 export default function RecordVideoScreen() {
 	const cameraRef = useRef<CameraView>(null);
 	const [permission, requestPermission] = useCameraPermissions();
+	const [micPermission, requestMicPermission] = useMicrophonePermissions();
 	const [isRecording, setIsRecording] = useState(false);
 	const [cameraReady, setCameraReady] = useState(false);
 	const [facing, setFacing] = useState<"back" | "front">("back");
@@ -27,6 +32,12 @@ export default function RecordVideoScreen() {
 			requestPermission();
 		}
 	}, [permission]);
+
+	useEffect(() => {
+		if (micPermission && !micPermission.granted) {
+			requestMicPermission();
+		}
+	}, [micPermission]);
 
 	const toggleRecording = async () => {
 		if (!cameraRef.current || !cameraReady) return;
@@ -62,7 +73,7 @@ export default function RecordVideoScreen() {
 		}
 	};
 
-	if (!permission?.granted) {
+	if (!permission?.granted || !micPermission?.granted) {
 		return (
 			<SafeAreaView style={styles.safe}>
 				<GradientBackground />
@@ -70,13 +81,16 @@ export default function RecordVideoScreen() {
 					<MaterialIcons name="videocam-off" size={48} color="#807A73" />
 					<Text style={styles.permissionTitle}>Camera Access Needed</Text>
 					<Text style={styles.permissionSub}>
-						We need camera permission to record a video of your sale items.
+						We need camera and microphone permission to record a video of your sale items.
 					</Text>
 					<TouchableOpacity
 						style={styles.permissionBtn}
-						onPress={requestPermission}
+						onPress={async () => {
+							await requestPermission();
+							await requestMicPermission();
+						}}
 					>
-						<Text style={styles.permissionBtnText}>Allow Camera</Text>
+						<Text style={styles.permissionBtnText}>Allow Camera & Microphone</Text>
 					</TouchableOpacity>
 				</View>
 			</SafeAreaView>

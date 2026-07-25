@@ -8,6 +8,7 @@ import {
 	SellDraft,
 } from "@/lib/draftSale";
 import { garageSaleService } from "@/services/garageSaleService";
+import { videoService } from "@/services/videoService";
 import { LinearGradient } from "expo-linear-gradient";
 import { ResizeMode, Video } from "expo-av";
 import { router } from "expo-router";
@@ -108,6 +109,17 @@ export default function PublishSaleScreen() {
 			const startTime = "10:00";
 			const endTime = "14:00";
 
+			// Upload video to Supabase Storage if we have one
+			let videoUrl: string | undefined;
+			if (draft.videoUri) {
+				try {
+					videoUrl = await videoService.uploadVideo(draft.videoUri);
+				} catch (uploadErr) {
+					console.error("Video upload failed:", uploadErr);
+					// Continue without video rather than blocking the publish
+				}
+			}
+
 			await garageSaleService.addGarageSale(
 				{
 					title: draft.title!,
@@ -126,7 +138,7 @@ export default function PublishSaleScreen() {
 					contactName: user?.user_metadata?.display_name || "Seller",
 					contactPhone: undefined,
 					contactEmail: user?.email || undefined,
-					videoUrl: draft.videoUri || undefined,
+					videoUrl,
 					images: draft.photos || undefined,
 					isActive: true,
 				},
