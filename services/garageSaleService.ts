@@ -210,6 +210,11 @@ export const garageSaleService = {
 				updateData.address = updates.location.address;
 			}
 			if (updates.date !== undefined) updateData.date = updates.date;
+			if (updates.startDate !== undefined) {
+				updateData.start_date = updates.startDate;
+				updateData.date = updates.startDate; // keep legacy column in sync
+			}
+			if (updates.endDate !== undefined) updateData.end_date = updates.endDate;
 			if (updates.startTime !== undefined)
 				updateData.start_time = updates.startTime;
 			if (updates.endTime !== undefined) updateData.end_time = updates.endTime;
